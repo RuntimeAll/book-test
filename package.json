@@ -1,0 +1,20 @@
+{
+  "name": "book-test",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "misikt 教师端复刻 - 跨栈 E2E 回归测试套（Playwright）",
+  "scripts": {
+    "test": "playwright test",
+    "test:v1": "playwright test tests/v1-question-bank-regression.spec.ts",
+    "test:v1:headed": "playwright test tests/v1-question-bank-regression.spec.ts --headed",
+    "test:headed": "playwright test --headed",
+    "report": "playwright show-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.60.0",
+    "@types/node": "^24.12.3",
+    "playwright": "^1.60.0",
+    "typescript": "~6.0.2"
+  }
+}
