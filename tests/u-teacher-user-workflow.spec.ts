@@ -215,6 +215,8 @@ test.describe('U 卡 · FE 登录分流 + 菜单按角色', () => {
 test.describe('U 卡 · 我的工作台 4 section 渲染', () => {
   test('teacher001 工作台 4 section 都能看到（空态文案 OK）', async ({ page }) => {
     await loginAs(page, TEACHER_USER, TEACHER_PWD)
+    // reload 让 pinia store 重读 localStorage（参 v1 spec gotoQuestionIndex 同款做法）
+    await page.reload()
     await page.goto('/#/workspace')
     await page.waitForLoadState('networkidle', { timeout: 15000 })
 
@@ -233,26 +235,87 @@ test.describe('U 卡 · 我的工作台 4 section 渲染', () => {
   })
 })
 
+test.describe('U 卡 段⑧ · 注册功能', () => {
+  test('BE /teacher/user/register 用户名重复返错', async ({ page }) => {
+    await page.goto('/#/login')
+    await page.waitForLoadState('domcontentloaded')
+    const resp = await page.evaluate(async () => {
+      const r = await fetch('/api/teacher/user/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userName: 'teacher001', password: '666666' }),
+      })
+      return await r.json()
+    })
+    // BE R 封装：成功 code=200 / 失败 code=500
+    expect(resp.code, 'teacher001 已存在，注册应失败').not.toBe(200)
+    expect(JSON.stringify(resp), '错误信息应含"已被注册"或"已存在"').toMatch(/已被注册|已存在/)
+  })
+
+  test('BE /teacher/user/register 创建新老师 + 自动绑 teacher 角色', async ({ page }) => {
+    await page.goto('/#/login')
+    await page.waitForLoadState('domcontentloaded')
+
+    // 用时间戳后 6 位生成唯一用户名（避免本测试重复跑撞 + 控制在 20 字符内）
+    const uniqueName = `t_e2e_${String(Date.now()).slice(-6)}`
+
+    // 1. 注册
+    const regResp = await page.evaluate(async (name) => {
+      const r = await fetch('/api/teacher/user/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userName: name, password: 'abc12345', nickName: 'E2E 测试老师' }),
+      })
+      return await r.json()
+    }, uniqueName)
+    // /teacher/* 走 MisiktEnvelopeAdvice — 成功 code=1（misikt 风格），不是 200
+    expect(regResp.code, '注册应成功 (envelope code=1)').toBe(1)
+    expect(regResp.response?.userName ?? regResp.data?.userName, 'BE 应返新建用户的 userName')
+      .toBe(uniqueName)
+
+    // 2. 用新账号登录
+    const token = await loginAs(page, uniqueName, 'abc12345')
+    expect(token, '注册的新老师应能登录').toBeTruthy()
+
+    // 3. 调 getCurrent 验证 roles 含 teacher
+    const userInfo = await callGetCurrent(page)
+    expect(userInfo.roles, '新注册老师应自动绑 teacher 角色').toContain('teacher')
+  })
+
+  test('FE /register 页能渲染 + 跳登录链接 OK', async ({ page }) => {
+    await page.goto('/#/register')
+    await page.waitForLoadState('domcontentloaded')
+
+    // 注册页 title / 表单字段
+    await expect(page.locator('.register-title')).toContainText('老师注册')
+    await expect(page.locator('input[autocomplete="username"]')).toBeVisible()
+    await expect(page.locator('input[autocomplete="new-password"]').first()).toBeVisible()
+
+    // 立即登录链接 → 跳 /login
+    await page.click('text=立即登录')
+    await page.waitForURL(/#\/login/, { timeout: 5000 })
+    expect(page.url()).toMatch(/#\/login/)
+  })
+})
+
 test.describe('U 卡 · FAB 路由白名单（P-2 一并实装）', () => {
   test('teacher001 在 /workspace 看见 FAB 试题栏', async ({ page }) => {
     await loginAs(page, TEACHER_USER, TEACHER_PWD)
+    await page.reload()
     await page.goto('/#/workspace')
     await page.waitForLoadState('domcontentloaded')
-    await page.waitForTimeout(1000)
-    // FAB 在白名单内（/workspace）应可见
-    // QuestionBasket 组件挂载 — selector 取本工程常见 FAB 容器
-    const fab = page.locator('.question-basket-fab, .basket-fab, [class*="basket"][class*="fab"]').first()
-    // 软断言 — FAB selector 不稳定时不强 fail
-    await expect(fab.or(page.locator('text=试题栏'))).toBeVisible({ timeout: 5000 })
+    await page.waitForTimeout(1500)
+    // QuestionBasket 真实 CSS class 是 .basket-fab（grep 自 src/components/business/QuestionBasket/index.vue）
+    await expect(page.locator('.basket-fab').first()).toBeVisible({ timeout: 5000 })
   })
 
   test('admin 在 /home 看不到 FAB 试题栏', async ({ page }) => {
     await loginAs(page, ADMIN_USER, ADMIN_PWD)
+    await page.reload()
     await page.goto('/#/home')
     await page.waitForLoadState('domcontentloaded')
-    await page.waitForTimeout(1000)
-    // /home 不在白名单 — FAB 应不可见
-    const fab = page.locator('.question-basket-fab, .basket-fab, [class*="basket"][class*="fab"]').first()
-    await expect(fab).toHaveCount(0)
+    await page.waitForTimeout(1500)
+    // /home 不在白名单 — .basket-fab 应不被渲染
+    await expect(page.locator('.basket-fab')).toHaveCount(0)
   })
 })
