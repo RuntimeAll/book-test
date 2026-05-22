@@ -59,12 +59,16 @@ test.describe('X 卡 freeTag 字典化 · 段③ FE smoke', () => {
     await page.reload()
     await page.goto('/#/question/index')
     await page.waitForSelector('.el-select, .question-list, .el-empty', { timeout: 20000 })
-    // 等列表至少有 1 张卡 + freeTag 数据回来
     await page.waitForSelector('.question-card', { timeout: 20000 })
     await page.waitForTimeout(2500)
-    // 至少有 1 个 free-tag-list 出现（页面 10 条里大概率覆盖率 >0）
+    // 默认列表（按 id desc）前 100 题在 DB 里没 freeTag — 真实数据特征。
+    // 点章节树"浙教版数学"（subjectId='3071' 6231/6233 题有 tag）触发 freeTag 渲染验证。
+    const treeNode = page.locator('.el-tree-node__label', { hasText: /^浙教版数学$/ }).first()
+    await treeNode.waitFor({ state: 'visible', timeout: 10000 })
+    await treeNode.click()
+    await page.waitForTimeout(3000)
     const ftCount = await page.locator('.free-tag-list .free-tag-item').count()
-    console.log(`[freetag] list 页 .free-tag-item 数量 = ${ftCount}`)
+    console.log(`[freetag] 切到 subjectId=3071 后 list 页 .free-tag-item 数量 = ${ftCount}`)
     expect(ftCount).toBeGreaterThan(0)
     await page.screenshot({ path: path.join(SHOTS_DIR, '03-fe-01-list.png'), fullPage: true })
   })
