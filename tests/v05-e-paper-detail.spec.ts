@@ -6,7 +6,7 @@
  *   T2: FE 卷头区 paperName + 4 chips (年份/总分/时长/题数)
  *   T3: FE 3 个大题标题（一、选择题 / 二、填空题 / 三、简答题）+ 小计
  *   T4: FE 24 题卡渲染 + 题号 1-24 连续
- *   T5: FE 点"详情"按钮 → QuestionDetailDrawer 弹出
+ *   T5: FE 点"详情"按钮 → 跳独立详情页 /question/detail/{id}（跟题库一致）
  *   T6: FE 点"+试题栏"按钮 → 全局 .basket-fab 角标 +1
  *   T7: FE 跨页共享 — source/2798 加 1 题 → 跳 question/index → 全局 FAB 角标保持 1
  *
@@ -175,22 +175,33 @@ test.describe('E 卡 段④ · 试卷详情完整页 + 通用组件 E2E', () => 
     console.log('[T4] 24 题卡 + 题号 1..24 PASS')
   })
 
-  test('T5. FE 点详情按钮 — QuestionDetailDrawer 弹出', async ({ page }) => {
+  test('T5. FE 点详情按钮 — 跳独立详情页 /question/detail/{id}（跟题库一致）', async ({ page }) => {
     await loginAsAdmin(page)
     await gotoSource(page)
-    // 第一题"详情"按钮（el-button 含文字"详情"，定位到第一张卡内）
+    // 读第一题 id 供路由断言
+    const firstQId = await page.evaluate(() => {
+      const card = document.querySelector('.source-question-card')
+      // q.id 不直接在 dataset 上，但 LS cache 写进去了 — 先点再断言
+      return card ? true : false
+    })
+    expect(firstQId).toBe(true)
+    // 第一题"详情"按钮
     const detailBtn = page.locator('.source-question-card').first().locator('button:has-text("详情")').first()
     await detailBtn.waitFor({ state: 'visible', timeout: 10000 })
     await detailBtn.click()
-    // drawer 弹（el-drawer 出现 + 标题"题目详情"）
-    await page.locator('.el-drawer__title:has-text("题目详情")').waitFor({ state: 'visible', timeout: 10000 })
-    // drawer 内含题型 tag + ID
-    const drawerContent = page.locator('.el-drawer__body')
-    await expect(drawerContent).toBeVisible()
-    const contentText = await drawerContent.textContent()
-    expect(contentText).toMatch(/选择题|填空题|简答题/)
-    await page.screenshot({ path: path.join(SHOTS_DIR, '05-fe-T5-drawer.png'), fullPage: true })
-    console.log('[T5] Drawer 弹出 PASS')
+    // 等路由跳转到 /question/detail/{id} (hash 路由)
+    await page.waitForURL(/\/question\/detail\/\d+/, { timeout: 10000 })
+    const url = page.url()
+    expect(url).toMatch(/#\/question\/detail\/\d+/)
+    // 题目详情页加载 — 详情页 topbar 含"题目详情"标题 / 主体 stem-area 在
+    await page.waitForSelector('.detail-page .topbar-title, .detail-page .stem-area', { timeout: 10000 })
+    const topbarTitle = await page.locator('.detail-page .topbar-title').textContent()
+    expect(topbarTitle?.trim()).toBe('题目详情')
+    // LS cache 已写入（确保兜底机制 work）
+    const cache = await page.evaluate(() => JSON.parse(localStorage.getItem('book-ui:question-cache-by-id') || '{}'))
+    expect(Object.keys(cache).length).toBeGreaterThan(0)
+    await page.screenshot({ path: path.join(SHOTS_DIR, '05-fe-T5-detail-page.png'), fullPage: true })
+    console.log('[T5] 跳详情页 PASS, url=', url)
   })
 
   test('T6. FE 点+试题栏 — 全局 .basket-fab 角标 +1', async ({ page }) => {
