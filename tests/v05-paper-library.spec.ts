@@ -225,9 +225,8 @@ test.describe('V0.5 卷库 UI 全链路', () => {
     const cards = page.locator('.paper-card')
     await expect(cards.first()).toBeVisible()
     expect(await cards.count(), '至少渲染 1 张卡片').toBeGreaterThan(0)
-    // 浮动按钮
-    await expect(page.locator('.floating-btn-basket')).toBeVisible()
-    await expect(page.locator('.floating-btn-qbar')).toBeVisible()
+    // 全局试题栏 FAB（E 卡 段③' 起挂 AppLayout — 原 .floating-btn-basket/.floating-btn-qbar 占位已删）
+    await expect(page.locator('.basket-fab')).toBeVisible()
   })
 
   test('卡片 4 字段渲染 — 总分/时长/题目数/创建时间', async ({ page }) => {
@@ -313,30 +312,15 @@ test.describe('V0.5 卷库 UI 全链路', () => {
     expect(page.url()).toContain(`/papers/source/${cardId}`)
   })
 
-  test('占位按钮"加入试卷篮" / 浮动"试卷篮" / "试题栏" → ElMessage 暂未开放', async ({ page }) => {
-    // 加入试卷篮
+  test('占位按钮"加入试卷篮" → ElMessage 暂未开放（浮动按钮 E 段③ 已删）', async ({ page }) => {
+    // 卡片内"加入试卷篮"el-link 保留（PRD F 卡范围，本 E 卡未动）
     await page.locator('.paper-card-actions .el-link').nth(1).first().click()
     await page.waitForTimeout(500)
     expect(await page.locator('.el-message').isVisible({ timeout: 2000 }).catch(() => false)).toBe(true)
     const msgText1 = await page.locator('.el-message').first().innerText()
     expect(msgText1).toContain('暂未开放')
-
-    // 等 toast 消失
-    await page.waitForTimeout(2500)
-
-    // 浮动试卷篮
-    await page.locator('.floating-btn-basket').click()
-    await page.waitForTimeout(500)
-    const msgText2 = await page.locator('.el-message').first().innerText()
-    expect(msgText2).toContain('暂未开放')
-
-    await page.waitForTimeout(2500)
-
-    // 浮动试题栏
-    await page.locator('.floating-btn-qbar').click()
-    await page.waitForTimeout(500)
-    const msgText3 = await page.locator('.el-message').first().innerText()
-    expect(msgText3).toContain('暂未开放')
+    // 原 .floating-btn-basket / .floating-btn-qbar 占位双浮按钮已被 E 卡 段③ 清掉 — 改为全局 <QuestionBasket />
+    // 全局 FAB 行为见 v05-e-paper-detail.spec.ts T6/T7
   })
 
   test('分页器 — 翻到第 2 页列表变化', async ({ page }) => {

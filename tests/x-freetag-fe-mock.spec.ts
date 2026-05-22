@@ -67,26 +67,39 @@ const MOCK_Q_33781_DETAIL = {
   explainImg: null,
 }
 
-const MOCK_PAPER_SOURCE_2798 = {
+// E 卡段③ 起 source.vue 改用 POST /teacher/exam/paper/detail（sections 嵌套结构）
+const MOCK_PAPER_DETAIL_2798 = {
   paperId: 2798,
   paperName: '【mock】2024 浙江中考数学卷',
+  subjectId: '3001',
+  score: 120,
+  suggestTime: 120,
+  questionCount: 2,
   examYear: '2024',
-  questions: [
+  paperType: 1,
+  sections: [
     {
-      id: 41001, questionType: 1, difficult: 2,
-      stemText: '【mock 卷题 1】带 3 个 freeTag (detail 模式 mini 三色)',
-      questionKnowledges: [],
-      freeTags: [
-        { id: 1, name: '函数', position: 0 },
-        { id: 2, name: '图像', position: 1 },
-        { id: 3, name: '抛物线', position: 2 },
+      sectionId: 9001, title: '选择题', sort: 1,
+      questions: [
+        {
+          id: 41001, questionType: 1, difficult: 2,
+          sort: 1, sortNum: 1, pqScore: 3.00, score: 0,
+          stemText: '【mock 卷题 1】带 3 个 freeTag (detail 模式 mini 三色)',
+          questionKnowledges: [],
+          freeTags: [
+            { id: 1, name: '函数', position: 0 },
+            { id: 2, name: '图像', position: 1 },
+            { id: 3, name: '抛物线', position: 2 },
+          ],
+        },
+        {
+          id: 41002, questionType: 4, difficult: 3,
+          sort: 2, sortNum: 2, pqScore: 3.00, score: 0,
+          stemText: '【mock 卷题 2】无 freeTag (不渲染 row)',
+          questionKnowledges: [],
+          freeTags: [],
+        },
       ],
-    },
-    {
-      id: 41002, questionType: 4, difficult: 3,
-      stemText: '【mock 卷题 2】无 freeTag (不渲染 row)',
-      questionKnowledges: [],
-      freeTags: [],
     },
   ],
 }
@@ -110,7 +123,8 @@ async function setupMocks(page: Page) {
   await page.route('**/api/teacher/question/select/33781', (route) => route.fulfill(tEnv(MOCK_Q_33781_DETAIL)))
   await page.route('**/api/teacher/qd/note/**', (route) => route.fulfill(tEnv(null)))
   await page.route('**/api/teacher/qd/papers/**', (route) => route.fulfill(tEnv([])))
-  await page.route('**/api/teacher/paper/source/2798', (route) => route.fulfill(tEnv(MOCK_PAPER_SOURCE_2798)))
+  // E 卡段③：source.vue 改调新接口
+  await page.route('**/api/teacher/exam/paper/detail', (route) => route.fulfill(tEnv(MOCK_PAPER_DETAIL_2798)))
 }
 
 async function fakeLogin(page: Page) {

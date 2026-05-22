@@ -276,40 +276,44 @@ test.describe('V1 卡 UI 全链路 — 题库页', () => {
     expect(out.sample, '列表至少有 1 题').toBeTruthy()
   })
 
-  test('Bug A — basket toggle 加/移无 ElMessage error', async ({ page }) => {
+  test('Bug A — basket toggle 加/移无 ElMessage error（E 段③ composable 化后改读 LS + UI 点击）', async ({ page }) => {
     const errorMessages: string[] = []
     page.on('console', m => {
       if (m.type() === 'error') errorMessages.push(m.text())
     })
 
-    const out = await page.evaluate(async () => {
-      let ctx: any = null
-      for (const el of document.querySelectorAll('.el-input')) {
-        // @ts-expect-error vue runtime
-        let c = el.__vueParentComponent
-        while (c) {
-          const x = c.setupState || c.ctx
-          if (x && x.filter && 'difficulty' in x.filter) { ctx = x; break }
-          c = c.parent
-        }
-        if (ctx) break
-      }
-      if (!ctx.questions || !ctx.questions.length) return { error: 'no questions' }
-      const q = ctx.questions[0]
-      const before = ctx.basketCount
-      await ctx.handleBasketToggle(q)
-      await new Promise<void>(r => setTimeout(r, 1200))
-      const after1 = { inBasket: ctx.inBasketIds.has(q.id), count: ctx.basketCount }
-      await ctx.handleBasketToggle(q)
-      await new Promise<void>(r => setTimeout(r, 1500))
-      const after2 = { inBasket: ctx.inBasketIds.has(q.id), count: ctx.basketCount }
-      return { qid: q.id, before, after1, after2,
-        hasErrorToast: !!document.querySelector('.el-message--error') }
+    // 清初始 LS basket
+    await page.evaluate(() => {
+      localStorage.removeItem('book-ui:basket-ids')
+      localStorage.removeItem('book-ui:basket-cache')
     })
-    expect(out.after1.inBasket, '加后应在 basket').toBe(true)
-    expect(out.after2.inBasket, '移除后应不在 basket').toBe(false)
-    expect(out.hasErrorToast, '不应弹"系统异常"').toBe(false)
+
+    // 点第一题"+试题栏" UI 按钮（CSS 类沿用现有：.action-btn--basket）
+    const basketBtn = page.locator('.question-card').first().locator('.action-btn--basket').first()
+    await basketBtn.waitFor({ state: 'visible', timeout: 10000 })
+    const qid = await page.locator('.question-card').first().getAttribute('data-question-id').catch(() => null)
+    await basketBtn.click()
+    await page.waitForFunction(
+      () => JSON.parse(localStorage.getItem('book-ui:basket-ids') || '[]').length >= 1,
+      { timeout: 5000 },
+    )
+    const idsAfterAdd = await page.evaluate(() => JSON.parse(localStorage.getItem('book-ui:basket-ids') || '[]'))
+    expect(idsAfterAdd.length, '加后 basket-ids 至少 1').toBeGreaterThanOrEqual(1)
+
+    // 再点一次 = 移除
+    await basketBtn.click()
+    await page.waitForFunction(
+      () => JSON.parse(localStorage.getItem('book-ui:basket-ids') || '[]').length === 0,
+      { timeout: 5000 },
+    )
+    const idsAfterRemove = await page.evaluate(() => JSON.parse(localStorage.getItem('book-ui:basket-ids') || '[]'))
+    expect(idsAfterRemove.length, '移后 basket-ids 应为 0').toBe(0)
+
+    // 不应弹 error toast
+    const hasErrorToast = await page.locator('.el-message--error').count()
+    expect(hasErrorToast, '不应弹"系统异常"').toBe(0)
     expect(errorMessages.length, 'console 应无 error').toBe(0)
+    void qid // 仅做诊断用
   })
 })
 
