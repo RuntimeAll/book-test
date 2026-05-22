@@ -205,6 +205,32 @@ test.describe('V1 卡 BE 端口契约 — curl 级别', () => {
     })
     expect(result.code).toBe(404)
   })
+
+  // J 卡段② BE 新加字段 — /page 响应每条 question 带 isFavorite boolean
+  test('J 卡段② — /page 响应每条 question 含 isFavorite 字段（LEFT JOIN biz_question_favorite）', async ({ page }) => {
+    const result = await page.evaluate(async () => {
+      const auth = JSON.parse(localStorage.getItem('book-ui:auth') || '{}')
+      const r = await fetch('/api/teacher/question/page', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + auth.access_token,
+          'clientid': auth.client_id,
+        },
+        body: JSON.stringify({ pageIndex: 1, pageSize: 5 }),
+      })
+      return await r.json()
+    })
+    expect(result.code, 'BE 应返 code=1').toBe(1)
+    const list = result.response?.list ?? result.data?.list ?? []
+    expect(list.length, '至少返 1 条题').toBeGreaterThan(0)
+    // 每条 question 必须有 isFavorite 字段（boolean 或 null — Boolean 类型）
+    for (const q of list) {
+      expect(q, `题 ${q.id} 应含 isFavorite 字段`).toHaveProperty('isFavorite')
+      const v = q.isFavorite
+      expect([true, false, null, 0, 1].includes(v), `isFavorite 值 ${v} 类型应为 boolean / null / 0 / 1`).toBe(true)
+    }
+  })
 })
 
 test.describe('V1 卡 UI 全链路 — 题库页', () => {
@@ -350,5 +376,33 @@ test.describe('V1 卡 核心目标 — 0 个 misikt.com 请求', () => {
     })
 
     expect(misiktRequests, `不应有 misikt.com 请求，实际: ${misiktRequests.join('\n')}`).toEqual([])
+  })
+})
+
+// J 卡段③ — N+1 反模式删除验证：进题库列表后不应有 N 次 GET /qd/favorite/{id}
+test.describe('J 卡段③ — N+1 favorite GET 已删', () => {
+  test('题库列表加载只调 /page 1 次，无 N 次 /qd/favorite/{id} GET', async ({ page }) => {
+    const favoriteGets: string[] = []
+    const pageReqs: string[] = []
+    page.on('request', req => {
+      const u = req.url()
+      // GET /qd/favorite/{id} 是原 loadFavoriteStatus N+1 反模式
+      if (req.method() === 'GET' && /\/teacher\/qd\/favorite\/\d+$/.test(u)) {
+        favoriteGets.push(u)
+      }
+      // POST /question/page
+      if (req.method() === 'POST' && u.includes('/teacher/question/page')) {
+        pageReqs.push(u)
+      }
+    })
+
+    await loginAsAdmin(page)
+    await gotoQuestionIndex(page)
+    // 等列表渲染完
+    await page.waitForSelector('.question-card', { timeout: 10000 }).catch(() => {})
+    await page.waitForTimeout(2000) // 给 N+1 一些可能触发的时间窗口
+
+    expect(pageReqs.length, '应至少调 1 次 /page').toBeGreaterThanOrEqual(1)
+    expect(favoriteGets.length, `不应有 GET /qd/favorite/{id} 请求（N+1 已删），实际: ${favoriteGets.join('\n')}`).toBe(0)
   })
 })
