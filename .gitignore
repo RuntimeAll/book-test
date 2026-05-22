@@ -3,7 +3,9 @@ node_modules/
 
 # Playwright 输出
 playwright-report/
+playwright-report-admin/
 test-results/
+test-results-admin/
 playwright/.cache/
 
 # 编辑器 / OS
