@@ -12,6 +12,8 @@
     "test:v05:headed": "playwright test tests/v05-paper-library.spec.ts --headed",
     "test:u": "playwright test tests/u-teacher-user-workflow.spec.ts",
     "test:u:headed": "playwright test tests/u-teacher-user-workflow.spec.ts --headed",
+    "test:q": "playwright test tests/q-compose-workbench.spec.ts",
+    "test:q:headed": "playwright test tests/q-compose-workbench.spec.ts --headed",
     "test:v15h": "playwright test --config=playwright-admin.config.ts tests/v15h-question-crud-admin.spec.ts --workers=1",
     "test:headed": "playwright test --headed",
     "report": "playwright show-report"
