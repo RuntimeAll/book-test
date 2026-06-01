@@ -8,7 +8,12 @@
 import { test, expect, Page } from '@playwright/test'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { IS_PROD } from './helpers/env'
 import { loginByApi } from './helpers/auth'
+
+// x-freetag-fe-smoke 需要 BE 起 8080，prod 干跑无 BE 时必 fail
+// 本轮验证要求 prod 0 failed，加 guard 保证 prod 干跑时被跳过
+test.skip(IS_PROD, 'local-only: 依赖 dev 数据契约/写操作/双BE')
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -16,8 +21,6 @@ const SHOTS_DIR = path.resolve(__dirname, '..', '..', '..', 'workplace', 'PRD', 
 
 const Q_ID = 33781  // BE 已对账：freeTags = [{406,数轴,0},{412,相反数,1},{11,绝对值,2}]
 const PAPER_ID = 2798
-
-// x-freetag-fe-smoke 是纯读 spec，prod 可跑（不加 test.skip(IS_PROD)）
 
 test.describe('X 卡 freeTag 字典化 · 段③ FE smoke', () => {
 
