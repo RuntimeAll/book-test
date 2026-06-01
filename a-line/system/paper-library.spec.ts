@@ -19,6 +19,7 @@
 import { test, expect, Page } from '@playwright/test'
 import { IS_PROD } from '../helpers/env'
 import { loginByApi } from '../helpers/auth'
+import { callPaperPageBe, expectFeBeTotalConsistent } from '../fixtures/contract'
 
 // local-only: 依赖 TREE_TOTAL ≥ 97 dev 数据契约
 test.skip(IS_PROD, 'local-only: 依赖 dev 数据契约/写操作/双BE')
@@ -236,12 +237,14 @@ test.describe('V0.5 卷库 UI 全链路', () => {
     expect(out.sampleId, '至少 1 张卷').toBeTruthy()
   })
 
-  test('搜索"中考" → 列表 total ≥ 80', async ({ page }) => {
-    await page.locator('.search-input input').fill('中考')
-    await page.locator('.search-btn').click()
-    await page.waitForTimeout(1500)
+  test('搜索"中考" → FE total 与 BE 同参一致（作用域感知，可信绿）', async ({ page }) => {
+    // Stage2a 校准说明：
+    //   卷库页默认是「作用域过滤」的（左侧树默认选中某分类如资料库），
+    //   搜索"中考"在当前作用域下的结果 ≠ 全库搜索结果（ ≥ 80 是错误假设）。
+    //   真正的守门规则：FE 显示 total 必须 === BE 同参（含当前 subjectId）返回的 total。
 
-    const total = await page.evaluate(() => {
+    // 先读取当前作用域（搜索前的 currentSubjectId）
+    const beforeSearchState = await page.evaluate(() => {
       let ctx: any = null
       for (const el of document.querySelectorAll('.papers-page')) {
         // @ts-expect-error vue runtime
@@ -253,9 +256,45 @@ test.describe('V0.5 卷库 UI 全链路', () => {
         }
         if (ctx) break
       }
-      return ctx?.total ?? -1
+      return ctx ? { subjectId: ctx.currentSubjectId ?? '' } : { subjectId: '' }
     })
-    expect(total).toBeGreaterThanOrEqual(EXPECTED.SEARCH_中考_MIN)
+
+    // 输入"中考"并搜索
+    await page.locator('.search-input input').fill('中考')
+    await page.locator('.search-btn').click()
+    await page.waitForTimeout(1500)
+
+    // 读 FE 搜索后的 total 和当前 subjectId
+    const feState = await page.evaluate(() => {
+      let ctx: any = null
+      for (const el of document.querySelectorAll('.papers-page')) {
+        // @ts-expect-error vue runtime
+        let c = el.__vueParentComponent
+        while (c) {
+          const x = c.setupState || c.ctx
+          if (x && 'total' in x && 'papers' in x) { ctx = x; break }
+          c = c.parent
+        }
+        if (ctx) break
+      }
+      return ctx
+        ? { total: ctx.total ?? -1, subjectId: ctx.currentSubjectId ?? '' }
+        : { total: -1, subjectId: '' }
+    })
+
+    // 用相同参数调 BE，取期望 total
+    const beTotal = await callPaperPageBe(page, {
+      name: '中考',
+      subjectId: feState.subjectId,
+      pageIndex: 1,
+      pageSize: 10,
+    })
+
+    // FE↔BE 一致性断言（核心守门）
+    expectFeBeTotalConsistent(feState.total, beTotal, `搜索"中考"（subjectId="${feState.subjectId}"，作用域感知）`)
+
+    // 搜索结果至少有 1 条（守门搜索功能未坏）
+    expect(feState.total, '搜索"中考"在当前作用域内至少应有 1 条结果').toBeGreaterThan(0)
   })
 
   test('点"查看"按钮 → 跳 /papers/source/{id} 显示卷头', async ({ page }) => {
@@ -282,15 +321,32 @@ test.describe('V0.5 卷库 UI 全链路', () => {
     expect(page.url()).toContain(`/papers/source/${cardId}`)
   })
 
-  test('占位按钮"加入试卷篮" → ElMessage 暂未开放（浮动按钮 E 段③ 已删）', async ({ page }) => {
-    // 卡片内"加入试卷篮"el-link 保留（PRD F 卡范围，本 E 卡未动）
-    await page.locator('.paper-card-actions .el-link').nth(1).first().click()
-    await page.waitForTimeout(500)
-    expect(await page.locator('.el-message').isVisible({ timeout: 2000 }).catch(() => false)).toBe(true)
-    const msgText1 = await page.locator('.el-message').first().innerText()
-    expect(msgText1).toContain('暂未开放')
-    // 原 .floating-btn-basket / .floating-btn-qbar 占位双浮按钮已被 E 卡 段③ 清掉 — 改为全局 <QuestionBasket />
-    // 全局 FAB 行为见 v05-e-paper-detail.spec.ts T6/T7
+  test('卡片"加入试卷篮"按钮 → 已实现真功能（显示"已加入试卷篮"或"已移出试卷篮"）', async ({ page }) => {
+    // Stage2a 校准说明：
+    //   原测试期望点击"加入试卷篮"弹出"暂未开放"（占位行为）。
+    //   但该功能已在后续卡实现：点击后真实加入试卷篮，显示"已加入试卷篮"绿色提示。
+    //   本测试从「测占位」改为「测真实功能」：
+    //     1. 点"加入试卷篮" → ElMessage 弹出且包含"试卷篮"相关文案（已加入 / 已移出）
+    //     2. 右侧 FAB 试卷篮浮动按钮存在（.basket-fab）
+    //   不再期望"暂未开放"。
+
+    // 点第 2 个 el-link（"加入试卷篮"）
+    const addBtn = page.locator('.paper-card-actions .el-link').nth(1).first()
+    await addBtn.waitFor({ state: 'visible', timeout: 5000 })
+    await addBtn.click()
+    await page.waitForTimeout(800)
+
+    // ElMessage 应弹出
+    const msgVisible = await page.locator('.el-message').isVisible({ timeout: 2000 }).catch(() => false)
+    expect(msgVisible, 'ElMessage 应弹出（加入或移出试卷篮）').toBe(true)
+
+    // 弹出内容应与试卷篮相关（"已加入试卷篮"或"已移出试卷篮"）
+    const msgText = await page.locator('.el-message').first().innerText()
+    const isBasketRelated = msgText.includes('试卷篮') || msgText.includes('加入') || msgText.includes('移出')
+    expect(isBasketRelated, `ElMessage 文案"${msgText}"应与试卷篮相关（已加入/已移出试卷篮）`).toBe(true)
+
+    // 全局 FAB 存在（E 卡 段③ 后替换占位双浮按钮）
+    await expect(page.locator('.basket-fab'), '全局试卷篮 FAB 应存在').toBeVisible()
   })
 
   test('分页器 — 翻到第 2 页列表变化', async ({ page }) => {
