@@ -63,7 +63,8 @@ export async function loginByCredentials(page: Page, user: string, pwd: string):
   expect(token, `loginByCredentials(${user}) 失败`).toBeTruthy()
 
   await page.reload()
-  await page.waitForLoadState('domcontentloaded')
+  await page.waitForLoadState('load')
+  await page.waitForTimeout(300)
 
   return token
 }
@@ -116,7 +117,10 @@ export async function loginByApi(page: Page, who: Who): Promise<string> {
 
   // 整页刷：让 pinia store 重 init 读到 LS token，否则 router guard 仍 isLoggedIn=false
   await page.reload()
-  await page.waitForLoadState('domcontentloaded')
+  // 等 load 而不是 domcontentloaded，确保 Vue app + router guard 完整执行完再返回
+  await page.waitForLoadState('load')
+  // 额外短暂等待让 router 跳转完成（router guard 可能在 load 后异步执行）
+  await page.waitForTimeout(300)
 
   return token
 }

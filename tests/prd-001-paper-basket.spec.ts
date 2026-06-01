@@ -66,9 +66,12 @@ async function clearPaperBasketBE(page: Page) {
 }
 
 /**
- * 进卷库页面 — loginByApi 已完成 reload，直接 goto 业务页
+ * 进卷库页面 — clearBasket 后再 reload 让 pinia 重新 init 读最新 LS 状态（basket=空）
+ * loginByApi 已有一次 reload（让 pinia 读到 token），
+ * clearBasket 后需要第二次 reload 让 pinia 重新读到 basket=0 状态。
  */
 async function gotoPapersIndex(page: Page) {
+  await page.reload()
   await page.goto('/#/papers/index')
   await page.waitForSelector('.paper-card, .el-empty', { timeout: 15000 })
   await page.waitForTimeout(1200) // 让首批 lazyTree + page 落
