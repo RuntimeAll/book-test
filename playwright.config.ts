@@ -20,6 +20,9 @@ const FE_PORT = Number(process.env.FE_PORT ?? 4010)
 const BOOK_UI = process.env.BOOK_UI_PATH
   ?? path.resolve(__dirname, '..', '..', 'codeplace-A', 'book-ui')
 
+// TEST_ENV 分支：prod → 打线上，不起 webServer；local（默认）→ 起本地 vite + BE 8080
+const IS_PROD = (process.env.TEST_ENV ?? 'local') === 'prod'
+
 // BE 8080 必须先手动起（mvn spring-boot:run -pl ruoyi-admin）
 // 测试通过 vite proxy /api → http://localhost:8080 间接打 BE
 export default defineConfig({
@@ -29,7 +32,7 @@ export default defineConfig({
   reporter: [['list'], ['html', { outputFolder: 'playwright-report', open: 'never' }]],
   outputDir: 'test-results',
   use: {
-    baseURL: `http://localhost:${FE_PORT}`,
+    baseURL: IS_PROD ? 'http://www.jpjia.cn' : `http://localhost:${FE_PORT}`,
     screenshot: 'only-on-failure',
     video: 'off',
     headless: process.env.HEADED !== '1',
@@ -48,7 +51,8 @@ export default defineConfig({
       },
     },
   ],
-  webServer: {
+  // prod 模式不起本地 webServer（打线上 jpjia.cn 直接用；local-only spec 已被 test.skip 守卫跳过）
+  webServer: IS_PROD ? undefined : {
     command: `pnpm dev --port ${FE_PORT}`,
     cwd: BOOK_UI,
     url: `http://localhost:${FE_PORT}`,
