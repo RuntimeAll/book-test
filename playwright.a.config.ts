@@ -29,6 +29,11 @@ export default defineConfig({
   testDir: './a-line',
   timeout: 60000,
   retries: 0,
+  // 🔴 串行执行：本套件共享同一 dev DB + BE + localStorage 试卷篮/试题篮状态，
+  // 并行多 worker 会跨用例串扰（A 卷篮写 vs B 详情读 FAB 角标）致假红。
+  // 回归底座要"可信绿"→ 必须确定性 → workers=1。determinism > speed。
+  workers: 1,
+  fullyParallel: false,
   reporter: [['list'], ['html', { outputFolder: 'playwright-report', open: 'never' }]],
   outputDir: 'test-results',
   use: {
