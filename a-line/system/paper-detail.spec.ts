@@ -197,10 +197,12 @@ test.describe('E 卡 段④ · 试卷详情完整页 + 通用组件 E2E', () => 
     const idsAfter = await page.evaluate(() => JSON.parse(localStorage.getItem('book-ui:basket-ids') || '[]'))
     expect(idsAfter.length).toBe(1)
     // 全局 FAB 角标 = 1（el-badge 显示 1）
-    const fab = page.locator('.basket-fab')
-    await fab.waitFor({ state: 'visible', timeout: 5000 })
+    // DOM 结构：el-badge.basket-fab-badge > div.basket-fab，角标在外层 badge 容器的 .el-badge__content，
+    // 不在内层 .basket-fab div 内 — 选 basket-fab-badge 才能找到 el-badge__content
+    const fabBadge = page.locator('.basket-fab-badge')
+    await fabBadge.waitFor({ state: 'visible', timeout: 5000 })
     // el-badge 子元素含 value="1"
-    const badgeText = await fab.locator('.el-badge__content').first().textContent()
+    const badgeText = await fabBadge.locator('.el-badge__content').first().textContent()
     expect(badgeText?.trim()).toBe('1')
     await page.screenshot({ path: path.join(SHOTS_DIR, '05-fe-T6-fab-1.png'), fullPage: true })
     console.log('[T6] FAB 角标 = 1 PASS')
@@ -226,9 +228,10 @@ test.describe('E 卡 段④ · 试卷详情完整页 + 通用组件 E2E', () => 
     await page.waitForSelector('.question-card, .el-empty', { timeout: 20000 })
     await page.waitForTimeout(1500)
     // 全局 FAB 在题库页也可见 + 角标保持 1
-    const fab = page.locator('.basket-fab')
-    await fab.waitFor({ state: 'visible', timeout: 5000 })
-    const badgeText = await fab.locator('.el-badge__content').first().textContent()
+    // DOM 结构：el-badge.basket-fab-badge > div.basket-fab，角标在外层 badge 容器的 .el-badge__content
+    const fabBadge = page.locator('.basket-fab-badge')
+    await fabBadge.waitFor({ state: 'visible', timeout: 5000 })
+    const badgeText = await fabBadge.locator('.el-badge__content').first().textContent()
     expect(badgeText?.trim()).toBe('1')
     // LS 也保持
     const ids = await page.evaluate(() => JSON.parse(localStorage.getItem('book-ui:basket-ids') || '[]'))
