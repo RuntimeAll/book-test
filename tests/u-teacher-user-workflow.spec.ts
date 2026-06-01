@@ -18,7 +18,7 @@
  *   pnpm test:u:headed           # 看浏览器
  */
 import { test, expect, Page } from '@playwright/test'
-import { IS_PROD } from './helpers/env'
+import { IS_PROD, TEACHER, ADMIN } from './helpers/env'
 import { loginByApi, loginByCredentials } from './helpers/auth'
 
 // local-only: 含写操作，依赖 dev 数据契约
@@ -128,8 +128,8 @@ test.describe('U 卡 · FE 登录分流 + 菜单按角色', () => {
     await loginByApi(page, 'admin')
     // 重新 goto /login 触发登录流（这次走 UI 而不是 fetch helper）
     await page.goto('/#/login')
-    await page.fill('input[autocomplete="username"]', ADMIN_USER)
-    await page.fill('input[autocomplete="current-password"]', ADMIN_PWD)
+    await page.fill('input[autocomplete="username"]', ADMIN.user)
+    await page.fill('input[autocomplete="current-password"]', ADMIN.pwd)
     await page.click('button.login-button, .login-button')
 
     // 等跳转完成（hash 路由 /home）
@@ -145,8 +145,8 @@ test.describe('U 卡 · FE 登录分流 + 菜单按角色', () => {
 
   test('teacher001 登录后跳 /workspace + 占位菜单隐藏', async ({ page }) => {
     await page.goto('/#/login')
-    await page.fill('input[autocomplete="username"]', TEACHER_USER)
-    await page.fill('input[autocomplete="current-password"]', TEACHER_PWD)
+    await page.fill('input[autocomplete="username"]', TEACHER.user)
+    await page.fill('input[autocomplete="current-password"]', TEACHER.pwd)
     await page.click('button.login-button, .login-button')
 
     // 等跳转完成（hash 路由 /workspace）
