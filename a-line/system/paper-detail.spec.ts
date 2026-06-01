@@ -20,8 +20,8 @@
 import { test, expect, Page } from '@playwright/test'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { IS_PROD, CLIENT_ID } from './helpers/env'
-import { loginByApi } from './helpers/auth'
+import { IS_PROD, CLIENT_ID } from '../helpers/env'
+import { loginByApi } from '../helpers/auth'
 
 // local-only: 依赖特定 paperId 2798 dev 数据
 test.skip(IS_PROD, 'local-only: 依赖 dev 数据契约/写操作/双BE')

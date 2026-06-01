@@ -13,8 +13,8 @@
  * MathJax CDN ERR_CONNECTION_CLOSED 是已知无关误报, 不判缺陷。
  */
 import { test, expect, Page, Request } from '@playwright/test'
-import { IS_PROD } from './helpers/env'
-import { loginByApi } from './helpers/auth'
+import { IS_PROD } from '../helpers/env'
+import { loginByApi } from '../helpers/auth'
 
 const PROFILE_URL = '/#/user/profile'
 

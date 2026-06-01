@@ -26,7 +26,7 @@ const IS_PROD = (process.env.TEST_ENV ?? 'local') === 'prod'
 // BE 8080 必须先手动起（mvn spring-boot:run -pl ruoyi-admin）
 // 测试通过 vite proxy /api → http://localhost:8080 间接打 BE
 export default defineConfig({
-  testDir: './tests',
+  testDir: './a-line',
   timeout: 60000,
   retries: 0,
   reporter: [['list'], ['html', { outputFolder: 'playwright-report', open: 'never' }]],

@@ -8,8 +8,8 @@
 import { test, expect, Page } from '@playwright/test'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { IS_PROD } from './helpers/env'
-import { loginByApi } from './helpers/auth'
+import { IS_PROD } from '../helpers/env'
+import { loginByApi } from '../helpers/auth'
 
 // x-freetag-fe-smoke 需要 BE 起 8080，prod 干跑无 BE 时必 fail
 // 本轮验证要求 prod 0 failed，加 guard 保证 prod 干跑时被跳过

@@ -14,13 +14,22 @@
 
 ```
 book-test/
-├── playwright.config.ts          # Chrome路径 / webServer 起 book-ui vite / baseURL
+├── playwright.a.config.ts        # A 线：Chrome路径 / webServer 起 book-ui vite :4010 / baseURL
+├── playwright.b.config.ts        # B 线：admin BE 7888，不起 webServer
 ├── package.json                  # Playwright 1.60 + ts
 ├── tsconfig.json
 ├── .gitignore                    # node_modules / playwright-report / test-results
-├── tests/
-│   ├── v1-question-bank-regression.spec.ts   # V1 卡 11 用例
-│   └── (未来新 spec)
+├── a-line/                       # A 线用户端（book-ui :4010 + book-server :8080）
+│   ├── system/                   # 全量基线 spec（v1 / v05 / q / u / x-freetag 等）
+│   ├── prd/                      # 增量 PRD 验收 spec（prd-a-001 / prd-a-002 等）
+│   ├── helpers/
+│   │   ├── env.ts                # 环境变量单一事实源（IS_PROD / TEACHER / ADMIN / CLIENT_ID）
+│   │   └── auth.ts               # 统一登录 helper（loginByApi / loginByCredentials）
+│   └── fixtures/                 # 占位（阶段 3 再写 contract.ts）
+├── b-line/                       # B 线 admin（book-admin :7999 + book-server :7888）
+│   ├── system/                   # B 线 spec（question-crud-admin / cross-be-smoke）
+│   └── helpers/
+│       └── env.ts                # B 线环境变量（IS_PROD / ADMIN / CLIENT_ID）
 └── README.md
 ```
 
@@ -80,18 +89,21 @@ SELECT COUNT(*) FROM biz_subject WHERE name LIKE '节点 %';   -- 0
 ```powershell
 cd D:\workplace\book-ai\codeplace-O\book-test
 
-# 跑 V1 全部 11 用例（headless，~25s）
-pnpm test:v1
-
-# 想看浏览器跑
-pnpm test:v1:headed
-
-# 只跑某组
-pnpm test:v1 --grep "BUG-2"
-pnpm test:v1 --grep "UI 全链路"
-
-# 跑所有 spec
+# A 线全套（headless，默认）
 pnpm test
+
+# A 线只跑 system 基线
+pnpm test:a:system
+
+# A 线只跑 prd 增量
+pnpm test:a:prd
+
+# PRD-A-001 / PRD-A-002
+pnpm test:prd001
+pnpm test:prd002
+
+# B 线（需先手动起 BE :7888）
+pnpm test:b
 
 # 跑完看 HTML 报告
 pnpm report

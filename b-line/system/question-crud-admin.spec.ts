@@ -23,7 +23,7 @@
  *   pnpm test:v15h --grep CRUD   # 单组
  */
 import { test, expect, request, APIRequestContext } from '@playwright/test'
-import { ADMIN, CLIENT_ID } from './helpers/env'
+import { ADMIN, CLIENT_ID } from '../helpers/env'
 
 // ─── 测试常量 ────────────────────────────────────────────────
 const BE_BASE = 'http://localhost:7888'

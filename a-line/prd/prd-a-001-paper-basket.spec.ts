@@ -21,8 +21,8 @@
  * local-only 守卫：加卷/移卷/合卷/导PDF 均为写操作，prod 跳过。
  */
 import { test, expect, type Page } from '@playwright/test'
-import { IS_PROD, CLIENT_ID } from './helpers/env'
-import { loginByApi } from './helpers/auth'
+import { IS_PROD, CLIENT_ID } from '../helpers/env'
+import { loginByApi } from '../helpers/auth'
 
 // LS keys（usePaperBasket.ts 顶部 LS_PAPER_BASKET_IDS / _CACHE 同源）
 const LS_BASKET_IDS = 'book-ui:paper-basket-ids'

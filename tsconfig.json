@@ -12,5 +12,5 @@
     "allowSyntheticDefaultImports": true,
     "types": ["@playwright/test", "node"]
   },
-  "include": ["tests/**/*.ts", "playwright.config.ts"]
+  "include": ["a-line/**/*.ts", "b-line/**/*.ts", "*.config.ts"]
 }

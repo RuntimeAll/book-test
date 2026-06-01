@@ -8,8 +8,8 @@
  *   pnpm exec playwright test prd-002-profile-regression --reporter=list
  */
 import { test, expect, Page } from '@playwright/test'
-import { IS_PROD } from './helpers/env'
-import { loginByApi } from './helpers/auth'
+import { IS_PROD } from '../helpers/env'
+import { loginByApi } from '../helpers/auth'
 
 // 候选 profile 路由（PRD 没硬性 URL；尽量穷举常见命名）
 const PROFILE_ROUTES = [

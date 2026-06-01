@@ -17,8 +17,8 @@
  *   pnpm test:v05:headed          # 看浏览器
  */
 import { test, expect, Page } from '@playwright/test'
-import { IS_PROD } from './helpers/env'
-import { loginByApi } from './helpers/auth'
+import { IS_PROD } from '../helpers/env'
+import { loginByApi } from '../helpers/auth'
 
 // local-only: 依赖 TREE_TOTAL ≥ 97 dev 数据契约
 test.skip(IS_PROD, 'local-only: 依赖 dev 数据契约/写操作/双BE')

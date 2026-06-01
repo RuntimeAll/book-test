@@ -27,7 +27,7 @@
  *   pnpm exec playwright test --config=playwright-admin.config.ts tests/merge-post-cross-be-smoke.spec.ts --workers=1
  */
 import { test, expect, request, APIRequestContext } from '@playwright/test'
-import { IS_PROD, ADMIN, CLIENT_ID } from './helpers/env'
+import { IS_PROD, ADMIN, CLIENT_ID } from '../helpers/env'
 
 // local-only: 双 BE 8080+7888 写死，prod 不起
 test.skip(IS_PROD, 'local-only: 依赖 dev 数据契约/写操作/双BE')

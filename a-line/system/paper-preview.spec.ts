@@ -17,8 +17,8 @@
  *   pnpm test:q-prime:headed       # 看浏览器（PDF download 行为需 headed 验）
  */
 import { test, expect, Page } from '@playwright/test'
-import { IS_PROD, CLIENT_ID } from './helpers/env'
-import { loginByApi } from './helpers/auth'
+import { IS_PROD, CLIENT_ID } from '../helpers/env'
+import { loginByApi } from '../helpers/auth'
 
 // local-only: 试卷预览/导出 PDF 为写操作
 test.skip(IS_PROD, 'local-only: 依赖 dev 数据契约/写操作/双BE')
