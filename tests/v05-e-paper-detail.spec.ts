@@ -11,7 +11,7 @@
  *   T7: FE 跨页共享 — source/2798 加 1 题 → 跳 question/index → 全局 FAB 角标保持 1
  *
  * 跑前置：
- *   1. BE 起 8080：cd codeSpace/book-server && mvn spring-boot:run -pl ruoyi-admin -Dspring-boot.run.profiles=dev
+ *   1. BE 起 8080：cd codeplace-A/book-server && mvn spring-boot:run -pl ruoyi-admin -Dspring-boot.run.profiles=dev
  *   2. webServer 自动起 vite (FE_PORT=4010 / playwright.config.ts)
  *
  * 跑：

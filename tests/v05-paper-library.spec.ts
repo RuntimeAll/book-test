@@ -8,7 +8,7 @@
  *   - 占位按钮：6 个"暂未开放" toast 验证
  *
  * 跑前置：
- *   1. BE 必须起：cd codeSpace/book-server/ruoyi-admin && mvn spring-boot:run
+ *   1. BE 必须起：cd codeplace-A/book-server/ruoyi-admin && mvn spring-boot:run
  *   2. DB 已落 D 卡 段① seed（biz_paper_category 97 行 + reconcile）
  *   3. admin/admin123 账号（RuoYi 默认）
  *

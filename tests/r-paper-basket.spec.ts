@@ -12,7 +12,7 @@
  *   R-8. 双 FAB 共存 — /papers 看试题栏 right:40px + 试卷篮 right:130px, 错位不重叠
  *
  * 跑前置：
- *   1. BE 必须起：cd codeSpace/book-server/ruoyi-admin && mvn spring-boot:run
+ *   1. BE 必须起：cd codeplace-A/book-server/ruoyi-admin && mvn spring-boot:run
  *   2. DB 已落 teacher001 / role_key='teacher'（U 卡段①）
  *   3. 卷库 ≥ 3 卷可加（V0.5 已就位 1592 卷）
  *   4. R 卡 BE 5 端点已起（addBasket/cancel/queryBasket/empty/basketNum）

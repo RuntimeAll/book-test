@@ -9,7 +9,7 @@
  *   核心目标 — 整会话 0 个 misikt.com 请求
  *
  * 跑前置：
- *   1. BE 必须起：cd codeSpace/book-server/ruoyi-admin && mvn spring-boot:run
+ *   1. BE 必须起：cd codeplace-A/book-server/ruoyi-admin && mvn spring-boot:run
  *   2. DB 已落 W-6 修复（miskt_data2.biz_subject 2116 行 / 占位名 0）
  *   3. admin/admin123 账号存在（RuoYi 默认）
  *

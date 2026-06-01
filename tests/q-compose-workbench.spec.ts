@@ -8,7 +8,7 @@
  *   T4. FAB 在 /question/compose 不显示（接 P-2 白名单）
  *
  * 跑前置：
- *   1. BE 必须起：cd codeSpace/book-server/ruoyi-admin && mvn spring-boot:run
+ *   1. BE 必须起：cd codeplace-A/book-server/ruoyi-admin && mvn spring-boot:run
  *   2. DB 已落 U 卡段① 配置（teacher001 / role_key='teacher'）
  *   3. 题库内有 ≥ 2 题（V1 ETL 已就位 1.6w 题）
  *

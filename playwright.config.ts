@@ -16,8 +16,9 @@ const LOCAL_CHROME = process.env.LOCAL_CHROME
 const FE_PORT = Number(process.env.FE_PORT ?? 4010)
 
 // book-ui 工程绝对路径（webServer cwd 跨目录跑）
+// book-test 已迁 codeplace-O/，book-ui 仍在 codeplace-A/ → 跨两级定位（env 可覆盖）
 const BOOK_UI = process.env.BOOK_UI_PATH
-  ?? path.resolve(__dirname, '..', 'book-ui')
+  ?? path.resolve(__dirname, '..', '..', 'codeplace-A', 'book-ui')
 
 // BE 8080 必须先手动起（mvn spring-boot:run -pl ruoyi-admin）
 // 测试通过 vite proxy /api → http://localhost:8080 间接打 BE

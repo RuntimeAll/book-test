@@ -8,7 +8,7 @@
  *   T4. 点"导出 PDF"触发下载（断 download 事件 / 不强求验 PDF 内容）
  *
  * 跑前置：
- *   1. BE 必须起：cd codeSpace/book-server/ruoyi-admin && mvn spring-boot:run
+ *   1. BE 必须起：cd codeplace-A/book-server/ruoyi-admin && mvn spring-boot:run
  *   2. DB 已落 U 卡段① 配置（teacher001 / role_key='teacher'）
  *   3. 题库内有 ≥ 5 有 freeTag 的题（MCP 已验 id 1045-1054 可用）
  *

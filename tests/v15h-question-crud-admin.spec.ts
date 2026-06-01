@@ -14,8 +14,8 @@
  * 本套针对 book-admin 端，只验后端契约 + 数据状态机；FE UI 验收走手动 / 后续完善。
  *
  * 跑前置：
- *   1. BE 必须起：cd D:\workplace\book-ai\codeSpace2\book-server\ruoyi-admin && mvn spring-boot:run -Dspring-boot.run.profiles=dev
- *      （注意端口 7888，不是 8080；走 codeSpace2 master-admin 分支）
+ *   1. BE 必须起：cd D:\workplace\book-ai\codeplace-B\book-server\ruoyi-admin && mvn spring-boot:run -Dspring-boot.run.profiles=dev
+ *      （注意端口 7888，不是 8080；走 codeplace-B master-admin 分支）
  *   2. DB miskt_data2 已就绪（admin 账号 + biz_subject 含 subjectId=3071001 浙教版数学）
  *
  * 跑：
@@ -70,7 +70,7 @@ test.beforeAll(async () => {
       grantType: 'password',
     },
   })
-  expect(loginResp.ok(), 'BE 7888 没起？检查 codeSpace2/book-server 是否在跑').toBeTruthy()
+  expect(loginResp.ok(), 'BE 7888 没起？检查 codeplace-B/book-server 是否在跑').toBeTruthy()
   const loginJson = await loginResp.json()
   expect(loginJson.code, `登录失败 msg=${loginJson.msg}`).toBe(200)
   token = loginJson.data?.access_token

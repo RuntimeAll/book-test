@@ -9,7 +9,7 @@
  *   - /teacher/exam/paper/page 接受 createBy 参数过滤（U-6 BE 新增）
  *
  * 跑前置：
- *   1. BE 必须起：cd codeSpace/book-server/ruoyi-admin && mvn spring-boot:run
+ *   1. BE 必须起：cd codeplace-A/book-server/ruoyi-admin && mvn spring-boot:run
  *   2. DB 已落 U 卡段① 配置（teacher001 / role_key='teacher'）
  *   3. admin / teacher001 账号都能登录
  *

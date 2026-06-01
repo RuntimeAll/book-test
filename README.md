@@ -48,7 +48,7 @@ pnpm exec playwright install chromium
 **装依赖**
 
 ```powershell
-cd D:\workplace\book-ai\codeSpace\book-test
+cd D:\workplace\book-ai\codeplace-O\book-test
 pnpm install
 ```
 
@@ -57,7 +57,7 @@ pnpm install
 **BE 必须先手动起**（webServer 只自动起 FE，不起 BE）：
 
 ```powershell
-cd D:\workplace\book-ai\codeSpace\book-server\ruoyi-admin
+cd D:\workplace\book-ai\codeplace-A\book-server\ruoyi-admin
 mvn spring-boot:run
 # 等到 "Started DromaraApplication" 再回来跑测试
 ```
@@ -78,7 +78,7 @@ SELECT COUNT(*) FROM biz_subject WHERE name LIKE '节点 %';   -- 0
 ### 3. 跑
 
 ```powershell
-cd D:\workplace\book-ai\codeSpace\book-test
+cd D:\workplace\book-ai\codeplace-O\book-test
 
 # 跑 V1 全部 11 用例（headless，~25s）
 pnpm test:v1
