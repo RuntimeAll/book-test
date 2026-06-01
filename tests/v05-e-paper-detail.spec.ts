@@ -20,6 +20,11 @@
 import { test, expect, Page } from '@playwright/test'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { IS_PROD, CLIENT_ID } from './helpers/env'
+import { loginByApi } from './helpers/auth'
+
+// local-only: 依赖特定 paperId 2798 dev 数据
+test.skip(IS_PROD, 'local-only: 依赖 dev 数据契约/写操作/双BE')
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -29,9 +34,6 @@ const SHOTS_DIR = path.resolve(
   'workplace', 'PRD', '2026-05-22-E-paper-detail-and-components', 'smoke',
 )
 
-const ADMIN_USER = 'admin'
-const ADMIN_PWD = 'admin123'
-const CLIENT_ID = 'e5cd7e4891bf95d1d19206ce24a7b32e'
 const BASE_HASH = '/teacher/#'
 
 // paper 2798 真数据（段① 体检）
@@ -48,40 +50,8 @@ const EXPECTED = {
   sortRange: { min: 1, max: 24 },
 }
 
-async function loginAsAdmin(page: Page): Promise<string> {
-  await page.goto(`${BASE_HASH}/login`)
-  await page.waitForLoadState('domcontentloaded')
-  const token = await page.evaluate(async ({ user, pwd, cid }) => {
-    const resp = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        username: user, password: pwd, clientId: cid,
-        grantType: 'password', tenantId: '000000',
-      }),
-    })
-    const j = await resp.json()
-    const data = j.data || {}
-    localStorage.setItem('book-ui:auth', JSON.stringify({
-      scope: data.scope ?? null,
-      openid: data.openid ?? null,
-      access_token: data.access_token,
-      refresh_token: data.refresh_token,
-      expire_in: data.expire_in,
-      refresh_expire_in: data.refresh_expire_in,
-      client_id: cid,
-    }))
-    // 清 basket 旧 LS（防上一轮残留干扰跨页 + 角标断言）
-    localStorage.removeItem('book-ui:basket-ids')
-    localStorage.removeItem('book-ui:basket-cache')
-    return data.access_token as string
-  }, { user: ADMIN_USER, pwd: ADMIN_PWD, cid: CLIENT_ID })
-  expect(token, '登录失败 — BE 8080 是否起？').toBeTruthy()
-  return token
-}
-
 async function gotoSource(page: Page, paperId: number = PAPER_ID) {
-  await page.reload()
+  // loginByApi 已完成 reload，直接 goto 业务页
   await page.goto(`${BASE_HASH}/papers/source/${paperId}`)
   await page.waitForSelector('.paper-header, .source-empty', { timeout: 20000 })
   await page.waitForTimeout(1500) // 让 BE 接口落 + DOM 完整渲染
@@ -90,7 +60,7 @@ async function gotoSource(page: Page, paperId: number = PAPER_ID) {
 test.describe('E 卡 段④ · 试卷详情完整页 + 通用组件 E2E', () => {
 
   test('T1. BE POST /teacher/exam/paper/detail 端点 — 卷头 + 3 section + 24 题', async ({ page }) => {
-    await loginAsAdmin(page)
+    await loginByApi(page, 'admin')
     const result = await page.evaluate(async ({ paperId, cid }) => {
       const auth = JSON.parse(localStorage.getItem('book-ui:auth') || '{}')
       const resp = await fetch('/api/teacher/exam/paper/detail', {
@@ -130,7 +100,7 @@ test.describe('E 卡 段④ · 试卷详情完整页 + 通用组件 E2E', () => 
   })
 
   test('T2. FE 卷头区 — paperName + 4 chips (年份/总分/时长/题数)', async ({ page }) => {
-    await loginAsAdmin(page)
+    await loginByApi(page, 'admin')
     await gotoSource(page)
     const title = await page.locator('.paper-header .paper-title').textContent()
     expect(title?.trim()).toBe(EXPECTED.paperName)
@@ -145,7 +115,7 @@ test.describe('E 卡 段④ · 试卷详情完整页 + 通用组件 E2E', () => 
   })
 
   test('T3. FE 大题分组 — 3 个 section 标题 + 小计', async ({ page }) => {
-    await loginAsAdmin(page)
+    await loginByApi(page, 'admin')
     await gotoSource(page)
     const titles = await page.locator('.paper-section .section-title').allTextContents()
     expect(titles.length).toBe(3)
@@ -161,7 +131,7 @@ test.describe('E 卡 段④ · 试卷详情完整页 + 通用组件 E2E', () => 
   })
 
   test('T4. FE 24 题卡 + 题号连续', async ({ page }) => {
-    await loginAsAdmin(page)
+    await loginByApi(page, 'admin')
     await gotoSource(page)
     const cards = await page.locator('.source-question-card').count()
     expect(cards).toBe(EXPECTED.questionCount)
@@ -176,7 +146,7 @@ test.describe('E 卡 段④ · 试卷详情完整页 + 通用组件 E2E', () => 
   })
 
   test('T5. FE 点详情按钮 — 跳独立详情页 /question/detail/{id}（跟题库一致）', async ({ page }) => {
-    await loginAsAdmin(page)
+    await loginByApi(page, 'admin')
     await gotoSource(page)
     // 读第一题 id 供路由断言
     const firstQId = await page.evaluate(() => {
@@ -205,7 +175,12 @@ test.describe('E 卡 段④ · 试卷详情完整页 + 通用组件 E2E', () => 
   })
 
   test('T6. FE 点+试题栏 — 全局 .basket-fab 角标 +1', async ({ page }) => {
-    await loginAsAdmin(page)
+    await loginByApi(page, 'admin')
+    // 清 basket 旧 LS（防上一轮残留干扰角标断言）
+    await page.evaluate(() => {
+      localStorage.removeItem('book-ui:basket-ids')
+      localStorage.removeItem('book-ui:basket-cache')
+    })
     await gotoSource(page)
     // 初始 FAB 角标 = 0（hidden）— 用 evaluate 读 LS 内 basket-ids
     const idsBefore = await page.evaluate(() => JSON.parse(localStorage.getItem('book-ui:basket-ids') || '[]'))
@@ -232,7 +207,12 @@ test.describe('E 卡 段④ · 试卷详情完整页 + 通用组件 E2E', () => 
   })
 
   test('T7. FE 跨页 — source/2798 加题 → question/index FAB 角标保持', async ({ page }) => {
-    await loginAsAdmin(page)
+    await loginByApi(page, 'admin')
+    // 清 basket 旧 LS
+    await page.evaluate(() => {
+      localStorage.removeItem('book-ui:basket-ids')
+      localStorage.removeItem('book-ui:basket-cache')
+    })
     await gotoSource(page)
     const basketBtn = page.locator('.source-question-card').first().locator('button:has-text("+ 试题栏"), button:has-text("+试题栏")').first()
     await basketBtn.waitFor({ state: 'visible', timeout: 10000 })

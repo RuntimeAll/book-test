@@ -27,12 +27,13 @@
  *   pnpm exec playwright test --config=playwright-admin.config.ts tests/merge-post-cross-be-smoke.spec.ts --workers=1
  */
 import { test, expect, request, APIRequestContext } from '@playwright/test'
+import { IS_PROD, ADMIN, CLIENT_ID } from './helpers/env'
+
+// local-only: 双 BE 8080+7888 写死，prod 不起
+test.skip(IS_PROD, 'local-only: 依赖 dev 数据契约/写操作/双BE')
 
 const TEACHER_BASE = 'http://localhost:8080'
 const ADMIN_BASE = 'http://localhost:7888'
-const ADMIN_USER = 'admin'
-const ADMIN_PWD = 'admin123'
-const CLIENT_ID = 'e5cd7e4891bf95d1d19206ce24a7b32e'
 
 let teacherApi: APIRequestContext
 let adminApi: APIRequestContext
@@ -52,8 +53,8 @@ test.afterAll(async () => {
 async function loginOn(api: APIRequestContext, host: string): Promise<string> {
   const resp = await api.post('/auth/login', {
     data: {
-      username: ADMIN_USER,
-      password: ADMIN_PWD,
+      username: ADMIN.user,
+      password: ADMIN.pwd,
       tenantId: '000000',
       clientId: CLIENT_ID,
       grantType: 'password',

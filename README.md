@@ -101,11 +101,25 @@ pnpm report
 
 | 变量 | 默认 | 说明 |
 |---|---|---|
+| `TEST_ENV` | `local` | 切换运行环境：`local`（本地，起 vite + BE 8080）/ `prod`（打 http://www.jpjia.cn，local-only spec 自动 skip，不起 webServer） |
 | `LOCAL_CHROME` | `D:/workplace/workTool/chrome-win64/chrome.exe` | 本地 Chrome 路径 |
-| `BOOK_UI_PATH` | `../book-ui`（相对 playwright.config.ts） | book-ui 工程绝对路径，webServer cwd 用 |
-| `FE_PORT` | `4010` | FE dev server 端口（webServer 起这个） |
+| `BOOK_UI_PATH` | `../../codeplace-A/book-ui`（相对 playwright.config.ts） | book-ui 工程绝对路径，webServer cwd 用 |
+| `FE_PORT` | `4010` | FE dev server 端口（webServer 起这个；TEST_ENV=prod 时无效） |
 | `HEADED` | unset = headless | 设 `1` 显示浏览器 |
 | `CI` | unset | 设了 `reuseExistingServer=false`，每次新起 FE |
+| `TEACHER_USER` | `teacher001` | 覆盖教师账号（prod 真凭据不进 repo） |
+| `TEACHER_PWD` | `666666` | 覆盖教师密码 |
+| `ADMIN_USER` | `admin` | 覆盖管理员账号 |
+| `ADMIN_PWD` | `admin123` | 覆盖管理员密码 |
+
+**切换示例**：
+```powershell
+# 默认 local（本地全套回归）
+pnpm test
+
+# prod 干跑（验 config + local-only skip；不实打 prod BE）
+$env:TEST_ENV='prod'; pnpm test; $env:TEST_ENV='local'
+```
 
 ---
 

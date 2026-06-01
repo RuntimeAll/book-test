@@ -17,10 +17,11 @@
  *   pnpm test:v05:headed          # 看浏览器
  */
 import { test, expect, Page } from '@playwright/test'
+import { IS_PROD } from './helpers/env'
+import { loginByApi } from './helpers/auth'
 
-const ADMIN_USER = 'admin'
-const ADMIN_PWD = 'admin123'
-const CLIENT_ID = 'e5cd7e4891bf95d1d19206ce24a7b32e'
+// local-only: 依赖 TREE_TOTAL ≥ 97 dev 数据契约
+test.skip(IS_PROD, 'local-only: 依赖 dev 数据契约/写操作/双BE')
 
 // vite base=/teacher/ → 业务页 URL 必须带 /teacher/ 前缀
 const BASE_HASH = '/teacher/#'
@@ -38,39 +39,8 @@ const EXPECTED = {
 
 // ─── helpers ─────────────────────────────────────────────────
 
-async function loginAsAdmin(page: Page): Promise<string> {
-  await page.goto(`${BASE_HASH}/login`)
-  await page.waitForLoadState('domcontentloaded')
-  const token = await page.evaluate(async ({ user, pwd, cid }) => {
-    const resp = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        username: user, password: pwd, clientId: cid,
-        grantType: 'password', tenantId: '000000',
-      }),
-    })
-    const j = await resp.json()
-    const data = j.data || {}
-    const auth = {
-      scope: data.scope ?? null,
-      openid: data.openid ?? null,
-      access_token: data.access_token,
-      refresh_token: data.refresh_token,
-      expire_in: data.expire_in,
-      refresh_expire_in: data.refresh_expire_in,
-      client_id: cid,
-    }
-    localStorage.setItem('book-ui:auth', JSON.stringify(auth))
-    return data.access_token as string
-  }, { user: ADMIN_USER, pwd: ADMIN_PWD, cid: CLIENT_ID })
-
-  expect(token, '登录失败 — BE 是否在 8080 起？').toBeTruthy()
-  return token
-}
-
 async function gotoPapersIndex(page: Page) {
-  await page.reload()
+  // loginByApi 已完成 reload，直接 goto 业务页
   await page.goto(`${BASE_HASH}/papers/index`)
   // 等树或列表或空态任一出现 = 业务 vm 已 mount
   await page.waitForSelector('.paper-card, .el-empty, .el-tree', { timeout: 15000 })
@@ -130,7 +100,7 @@ async function callPaperLazyTreeTotal(page: Page): Promise<{ roots: number, tota
 
 test.describe('V0.5 卷库 BE 端口契约', () => {
   test.beforeEach(async ({ page }) => {
-    await loginAsAdmin(page)
+    await loginByApi(page, 'admin')
   })
 
   test('lazyTree — 3 根 / 97 节点（跟 misikt 真响应字节级一致）', async ({ page }) => {
@@ -209,7 +179,7 @@ test.describe('V0.5 卷库 BE 端口契约', () => {
 
 test.describe('V0.5 卷库 UI 全链路', () => {
   test.beforeEach(async ({ page }) => {
-    await loginAsAdmin(page)
+    await loginByApi(page, 'admin')
     await gotoPapersIndex(page)
   })
 
@@ -351,7 +321,7 @@ test.describe('V0.5 卷库 核心目标 — 0 个 misikt.com 请求', () => {
         misiktRequests.push(req.url())
       }
     })
-    await loginAsAdmin(page)
+    await loginByApi(page, 'admin')
     await gotoPapersIndex(page)
     // 翻页 + 搜索 + 树点击都触发一遍
     await page.locator('.el-tree-node__label', { hasText: '公共试卷' }).first().click()

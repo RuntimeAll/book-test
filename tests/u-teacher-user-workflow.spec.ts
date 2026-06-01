@@ -18,58 +18,11 @@
  *   pnpm test:u:headed           # 看浏览器
  */
 import { test, expect, Page } from '@playwright/test'
+import { IS_PROD } from './helpers/env'
+import { loginByApi, loginByCredentials } from './helpers/auth'
 
-// ─── 测试常量 ────────────────────────────────────────────────
-const ADMIN_USER = 'admin'
-const ADMIN_PWD = 'admin123'
-const TEACHER_USER = 'teacher001'
-const TEACHER_PWD = '666666'
-const CLIENT_ID = 'e5cd7e4891bf95d1d19206ce24a7b32e'
-
-// ─── 公共 helper（基于 v1 spec loginAsAdmin 衍生）──────────────────────
-
-/**
- * 通用登录 — 走 /auth/login fetch 拿 token 注入 localStorage。
- * 不 reload —— 由 caller 在 goto 业务页前自行 reload（让 store init 拿到 localStorage）。
- */
-async function loginAs(
-  page: Page,
-  username: string,
-  password: string,
-): Promise<string> {
-  await page.goto('/#/login')
-  await page.waitForLoadState('domcontentloaded')
-
-  const token = await page.evaluate(async ({ user, pwd, cid }) => {
-    const resp = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        username: user,
-        password: pwd,
-        clientId: cid,
-        grantType: 'password',
-        tenantId: '000000',
-      }),
-    })
-    const j = await resp.json()
-    const data = j.data || {}
-    const auth = {
-      scope: data.scope ?? null,
-      openid: data.openid ?? null,
-      access_token: data.access_token,
-      refresh_token: data.refresh_token,
-      expire_in: data.expire_in,
-      refresh_expire_in: data.refresh_expire_in,
-      client_id: cid,
-    }
-    localStorage.setItem('book-ui:auth', JSON.stringify(auth))
-    return data.access_token as string
-  }, { user: username, pwd: password, cid: CLIENT_ID })
-
-  expect(token, `登录失败 — ${username} 账号是否存在？BE 8080 是否起？`).toBeTruthy()
-  return token
-}
+// local-only: 含写操作，依赖 dev 数据契约
+test.skip(IS_PROD, 'local-only: 依赖 dev 数据契约/写操作/双BE')
 
 /**
  * 调 /api/teacher/user/current 拿当前用户信息（含 roles）。
@@ -124,7 +77,7 @@ async function callPaperPage(
 
 test.describe('U 卡 · BE /teacher/user/current 返 roles 字段', () => {
   test('admin 调 getCurrent 返 roles 含 superadmin', async ({ page }) => {
-    await loginAs(page, ADMIN_USER, ADMIN_PWD)
+    await loginByApi(page, 'admin')
     const userInfo = await callGetCurrent(page)
     expect(userInfo.userName, 'admin user_name 错位').toBe('admin')
     expect(Array.isArray(userInfo.roles), 'roles 字段必须是数组（BE 加 roles[]）').toBe(true)
@@ -135,7 +88,7 @@ test.describe('U 卡 · BE /teacher/user/current 返 roles 字段', () => {
   })
 
   test('teacher001 调 getCurrent 返 roles 含 teacher', async ({ page }) => {
-    await loginAs(page, TEACHER_USER, TEACHER_PWD)
+    await loginByApi(page, 'teacher')
     const userInfo = await callGetCurrent(page)
     expect(userInfo.userName, 'teacher001 user_name 错位').toBe('teacher001')
     expect(userInfo.roles, 'teacher001 roles 必须含 teacher').toContain('teacher')
@@ -144,7 +97,7 @@ test.describe('U 卡 · BE /teacher/user/current 返 roles 字段', () => {
 
 test.describe('U 卡 · BE /teacher/exam/paper/page 接受 createBy 过滤', () => {
   test('createBy=999999999 不存在的用户返空集 total=0', async ({ page }) => {
-    await loginAs(page, ADMIN_USER, ADMIN_PWD)
+    await loginByApi(page, 'admin')
     const result = await callPaperPage(page, {
       pageIndex: 1,
       pageSize: 10,
@@ -154,7 +107,7 @@ test.describe('U 卡 · BE /teacher/exam/paper/page 接受 createBy 过滤', () 
   })
 
   test('createBy=非数字字符串触发防注入返空', async ({ page }) => {
-    await loginAs(page, ADMIN_USER, ADMIN_PWD)
+    await loginByApi(page, 'admin')
     const result = await callPaperPage(page, {
       pageIndex: 1,
       pageSize: 10,
@@ -164,7 +117,7 @@ test.describe('U 卡 · BE /teacher/exam/paper/page 接受 createBy 过滤', () 
   })
 
   test('createBy=空串 / 不传 不过滤（向后兼容）', async ({ page }) => {
-    await loginAs(page, ADMIN_USER, ADMIN_PWD)
+    await loginByApi(page, 'admin')
     const result = await callPaperPage(page, { pageIndex: 1, pageSize: 10 })
     expect(result.total, '不传 createBy 应返全部已发布卷').toBeGreaterThan(0)
   })
@@ -172,7 +125,7 @@ test.describe('U 卡 · BE /teacher/exam/paper/page 接受 createBy 过滤', () 
 
 test.describe('U 卡 · FE 登录分流 + 菜单按角色', () => {
   test('admin 登录后跳 /home + 菜单全显', async ({ page }) => {
-    await loginAs(page, ADMIN_USER, ADMIN_PWD)
+    await loginByApi(page, 'admin')
     // 重新 goto /login 触发登录流（这次走 UI 而不是 fetch helper）
     await page.goto('/#/login')
     await page.fill('input[autocomplete="username"]', ADMIN_USER)
@@ -214,9 +167,8 @@ test.describe('U 卡 · FE 登录分流 + 菜单按角色', () => {
 
 test.describe('U 卡 · 我的工作台 4 section 渲染', () => {
   test('teacher001 工作台 4 section 都能看到（空态文案 OK）', async ({ page }) => {
-    await loginAs(page, TEACHER_USER, TEACHER_PWD)
-    // reload 让 pinia store 重读 localStorage（参 v1 spec gotoQuestionIndex 同款做法）
-    await page.reload()
+    await loginByApi(page, 'teacher')
+    // loginByApi 已完成 reload，直接 goto
     await page.goto('/#/workspace')
     await page.waitForLoadState('networkidle', { timeout: 15000 })
 
@@ -274,7 +226,7 @@ test.describe('U 卡 段⑧ · 注册功能', () => {
       .toBe(uniqueName)
 
     // 2. 用新账号登录
-    const token = await loginAs(page, uniqueName, 'abc12345')
+    const token = await loginByCredentials(page, uniqueName, 'abc12345')
     expect(token, '注册的新老师应能登录').toBeTruthy()
 
     // 3. 调 getCurrent 验证 roles 含 teacher
@@ -300,8 +252,8 @@ test.describe('U 卡 段⑧ · 注册功能', () => {
 
 test.describe('U 卡 · FAB 路由白名单（P-2 一并实装）', () => {
   test('teacher001 在 /workspace 看见 FAB 试题栏', async ({ page }) => {
-    await loginAs(page, TEACHER_USER, TEACHER_PWD)
-    await page.reload()
+    await loginByApi(page, 'teacher')
+    // loginByApi 已完成 reload
     await page.goto('/#/workspace')
     await page.waitForLoadState('domcontentloaded')
     await page.waitForTimeout(1500)
@@ -310,8 +262,8 @@ test.describe('U 卡 · FAB 路由白名单（P-2 一并实装）', () => {
   })
 
   test('admin 在 /home 看不到 FAB 试题栏', async ({ page }) => {
-    await loginAs(page, ADMIN_USER, ADMIN_PWD)
-    await page.reload()
+    await loginByApi(page, 'admin')
+    // loginByApi 已完成 reload
     await page.goto('/#/home')
     await page.waitForLoadState('domcontentloaded')
     await page.waitForTimeout(1500)

@@ -17,68 +17,30 @@
  *   pnpm test:q:headed           # 看浏览器
  */
 import { test, expect, Page } from '@playwright/test'
+import { IS_PROD, CLIENT_ID } from './helpers/env'
+import { loginByApi } from './helpers/auth'
 
-const TEACHER_USER = 'teacher001'
-const TEACHER_PWD = '666666'
-const CLIENT_ID = 'e5cd7e4891bf95d1d19206ce24a7b32e'
-
-/**
- * 登录 — 走 /auth/login fetch 拿 token 注入 localStorage。
- * caller 后续需 reload 让 pinia store init 读到 LS。
- */
-async function loginAsTeacher(page: Page): Promise<string> {
-  await page.goto('/#/login')
-  await page.waitForLoadState('domcontentloaded')
-
-  const token = await page.evaluate(async ({ user, pwd, cid }) => {
-    const resp = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        username: user,
-        password: pwd,
-        clientId: cid,
-        grantType: 'password',
-        tenantId: '000000',
-      }),
-    })
-    const j = await resp.json()
-    const data = j.data || {}
-    const auth = {
-      scope: data.scope ?? null,
-      openid: data.openid ?? null,
-      access_token: data.access_token,
-      refresh_token: data.refresh_token,
-      expire_in: data.expire_in,
-      refresh_expire_in: data.refresh_expire_in,
-      client_id: cid,
-    }
-    localStorage.setItem('book-ui:auth', JSON.stringify(auth))
-    return data.access_token as string
-  }, { user: TEACHER_USER, pwd: TEACHER_PWD, cid: CLIENT_ID })
-
-  expect(token, '登录失败 — teacher001 账号是否存在？BE 8080 是否起？').toBeTruthy()
-  return token
-}
+// local-only: 组卷为写操作
+test.skip(IS_PROD, 'local-only: 依赖 dev 数据契约/写操作/双BE')
 
 /**
  * 通过 fetch 拿题库前 N 题的 id（不走 UI，节省时间）。
  */
 async function fetchQuestionIds(page: Page, token: string, count: number): Promise<number[]> {
-  const ids = await page.evaluate(async ({ tk, n }) => {
+  const ids = await page.evaluate(async ({ tk, n, cid }) => {
     const resp = await fetch('/api/teacher/question/page', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${tk}`,
-        clientid: 'e5cd7e4891bf95d1d19206ce24a7b32e',
+        clientid: cid,
       },
       body: JSON.stringify({ pageIndex: 1, pageSize: n }),
     })
     const j = await resp.json()
     const list = j?.response?.list || j?.data?.list || []
     return (list as Array<{ id: number }>).slice(0, n).map(q => q.id)
-  }, { tk: token, n: count })
+  }, { tk: token, n: count, cid: CLIENT_ID })
   expect(ids.length, '题库返题数不足 — V1 ETL 是否就位？').toBeGreaterThanOrEqual(count)
   return ids
 }
@@ -103,10 +65,8 @@ async function seedBasketLS(page: Page, ids: number[]) {
 test.describe('Q 卡 · 组卷工作台', () => {
 
   test('T1. /question/compose 路由可达 — 工作台页面渲染', async ({ page }) => {
-    await loginAsTeacher(page)
-    // 必须 reload 让 pinia store init 拿 LS token，否则 router guard 重定向回 /login（U 卡踩坑沉淀）
-    await page.reload()
-    await page.waitForLoadState('domcontentloaded')
+    await loginByApi(page, 'teacher')
+    // loginByApi 内已完成 reload，直接 goto 业务页
     await page.goto('/#/question/compose')
     await page.waitForLoadState('domcontentloaded')
 
@@ -117,16 +77,16 @@ test.describe('Q 卡 · 组卷工作台', () => {
   })
 
   test('T2. createExamPaper API 200 — 拿 paperId', async ({ page }) => {
-    const token = await loginAsTeacher(page)
+    const token = await loginByApi(page, 'teacher')
     const questionIds = await fetchQuestionIds(page, token, 2)
 
-    const result = await page.evaluate(async ({ tk, qids }) => {
+    const result = await page.evaluate(async ({ tk, qids, cid }) => {
       const resp = await fetch('/api/teacher/exam/paper/create', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${tk}`,
-          clientid: 'e5cd7e4891bf95d1d19206ce24a7b32e',
+          clientid: cid,
         },
         body: JSON.stringify({
           name: `Q 卡 E2E 测试卷 ${Date.now()}`,
@@ -137,7 +97,7 @@ test.describe('Q 卡 · 组卷工作台', () => {
         status: resp.status,
         body: await resp.json(),
       }
-    }, { tk: token, qids: questionIds })
+    }, { tk: token, qids: questionIds, cid: CLIENT_ID })
 
     expect(result.status, 'HTTP 200').toBe(200)
     // /teacher/* 走 MisiktEnvelopeAdvice envelope { code:1, message:"成功", response: {paperId, questionCount} }
@@ -147,7 +107,7 @@ test.describe('Q 卡 · 组卷工作台', () => {
   })
 
   test('T3. 创建成功跳 /papers/source/{id} 卷详情', async ({ page }) => {
-    const token = await loginAsTeacher(page)
+    const token = await loginByApi(page, 'teacher')
     const questionIds = await fetchQuestionIds(page, token, 2)
 
     // 1. 进工作台前先 seed LS basket
@@ -183,10 +143,8 @@ test.describe('Q 卡 · 组卷工作台', () => {
   })
 
   test('T4. FAB 在 /question/compose 不显示（接 P-2 白名单）', async ({ page }) => {
-    await loginAsTeacher(page)
-    // reload 让 store init 拿 LS token，避免 router guard 重定向 — 否则在 /login 也没 FAB 是伪 PASS
-    await page.reload()
-    await page.waitForLoadState('domcontentloaded')
+    await loginByApi(page, 'teacher')
+    // loginByApi 内已完成 reload，直接 goto 业务页
     await page.goto('/#/question/compose')
     await page.waitForLoadState('domcontentloaded')
 

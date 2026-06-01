@@ -8,49 +8,16 @@
 import { test, expect, Page } from '@playwright/test'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { loginByApi } from './helpers/auth'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const SHOTS_DIR = path.resolve(__dirname, '..', '..', '..', 'workplace', 'PRD', '2026-05-22-X-freetag-dict', 'smoke')
 
-const ADMIN_USER = 'admin'
-const ADMIN_PWD = 'admin123'
-const CLIENT_ID = 'e5cd7e4891bf95d1d19206ce24a7b32e'
 const Q_ID = 33781  // BE 已对账：freeTags = [{406,数轴,0},{412,相反数,1},{11,绝对值,2}]
 const PAPER_ID = 2798
 
-async function loginAsAdmin(page: Page): Promise<string> {
-  await page.goto('/#/login')
-  await page.waitForLoadState('domcontentloaded')
-  const token = await page.evaluate(async ({ user, pwd, cid }) => {
-    const resp = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        username: user,
-        password: pwd,
-        clientId: cid,
-        grantType: 'password',
-        tenantId: '000000',
-      }),
-    })
-    const j = await resp.json()
-    const data = j.data || {}
-    const auth = {
-      scope: data.scope ?? null,
-      openid: data.openid ?? null,
-      access_token: data.access_token,
-      refresh_token: data.refresh_token,
-      expire_in: data.expire_in,
-      refresh_expire_in: data.refresh_expire_in,
-      client_id: cid,
-    }
-    localStorage.setItem('book-ui:auth', JSON.stringify(auth))
-    return data.access_token as string
-  }, { user: ADMIN_USER, pwd: ADMIN_PWD, cid: CLIENT_ID })
-  expect(token, '登录失败 — BE 8080 起了吗？admin 账号在吗？').toBeTruthy()
-  return token
-}
+// x-freetag-fe-smoke 是纯读 spec，prod 可跑（不加 test.skip(IS_PROD)）
 
 test.describe('X 卡 freeTag 字典化 · 段③ FE smoke', () => {
 
@@ -60,8 +27,7 @@ test.describe('X 卡 freeTag 字典化 · 段③ FE smoke', () => {
   // （树节点 lazy-load 展开 + handleNodeClick 异步链路）。归类为 X 卡历史 spec 稳定性问题，
   // 不阻塞 E 卡验收（v05-e 7/7 PASS / v05 v1 全 PASS / X T2-T4 全 PASS）。
   test.skip('1. 题库列表 question/index — list 模式：position 0 medium + 后续 mini 三色循环', async ({ page }) => {
-    await loginAsAdmin(page)
-    await page.reload()
+    await loginByApi(page, 'admin')
     await page.goto('/#/question/index')
     await page.waitForSelector('.el-select, .question-list, .el-empty', { timeout: 20000 })
     await page.waitForSelector('.question-card', { timeout: 20000 })
@@ -80,8 +46,7 @@ test.describe('X 卡 freeTag 字典化 · 段③ FE smoke', () => {
   })
 
   test('2. 题目详情独立页 question/detail/33781 — detail 模式 + 3 个 tag (数轴/相反数/绝对值)', async ({ page }) => {
-    await loginAsAdmin(page)
-    await page.reload()
+    await loginByApi(page, 'admin')
     await page.goto(`/#/question/detail/${Q_ID}`)
     await page.waitForLoadState('domcontentloaded')
     await page.waitForTimeout(3000)
@@ -98,8 +63,7 @@ test.describe('X 卡 freeTag 字典化 · 段③ FE smoke', () => {
 
   test('3. 抽屉 QuestionDetailDrawer — list 卡片"详情"按钮已替换为路由，跳过；改用列表上首张卡片 hover 截图', async ({ page }) => {
     // 抽屉组件在 index.vue 已注释（第十二波路由替代）— 本测仅取列表整页第 2 张截图作为"抽屉位 N/A"凭证
-    await loginAsAdmin(page)
-    await page.reload()
+    await loginByApi(page, 'admin')
     await page.goto('/#/question/index')
     await page.waitForSelector('.question-card', { timeout: 20000 })
     await page.waitForTimeout(2500)
@@ -107,8 +71,7 @@ test.describe('X 卡 freeTag 字典化 · 段③ FE smoke', () => {
   })
 
   test('4. 卷库原卷预览 papers/source/2798 — detail 模式：24 题至少 N 题有 freeTags', async ({ page }) => {
-    await loginAsAdmin(page)
-    await page.reload()
+    await loginByApi(page, 'admin')
     await page.goto(`/#/papers/source/${PAPER_ID}`)
     await page.waitForLoadState('domcontentloaded')
     await page.waitForSelector('.source-question-card, .source-empty', { timeout: 20000 })

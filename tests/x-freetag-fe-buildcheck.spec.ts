@@ -7,6 +7,10 @@
 import { test, expect } from '@playwright/test'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { IS_PROD } from './helpers/env'
+
+// local-only: FE buildcheck 无 BE 意义，prod 环境跳过
+test.skip(IS_PROD, 'local-only: 依赖 dev 数据契约/写操作/双BE')
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)

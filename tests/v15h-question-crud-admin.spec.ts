@@ -23,12 +23,10 @@
  *   pnpm test:v15h --grep CRUD   # 单组
  */
 import { test, expect, request, APIRequestContext } from '@playwright/test'
+import { ADMIN, CLIENT_ID } from './helpers/env'
 
 // ─── 测试常量 ────────────────────────────────────────────────
 const BE_BASE = 'http://localhost:7888'
-const ADMIN_USER = 'admin'
-const ADMIN_PWD = 'admin123'
-const CLIENT_ID = 'e5cd7e4891bf95d1d19206ce24a7b32e'
 
 // 已知有效 ID（V1 卡数据建模 W-6 修复后稳定存在）
 const FIXTURE = {
@@ -63,8 +61,8 @@ test.beforeAll(async () => {
   // 登录拿 token（注意 tenantId='000000'，否则 BE 抛"租户编号不能为空"）
   const loginResp = await api.post('/auth/login', {
     data: {
-      username: ADMIN_USER,
-      password: ADMIN_PWD,
+      username: ADMIN.user,
+      password: ADMIN.pwd,
       tenantId: '000000',
       clientId: CLIENT_ID,
       grantType: 'password',

@@ -23,6 +23,52 @@ import { TEACHER, ADMIN, CLIENT_ID } from './env'
 type Who = 'teacher' | 'admin'
 
 /**
+ * 以任意凭据登录（用于动态账号测试，如注册后用新账号登录）。
+ * 内部已完成 localStorage 写入 + page.reload() + domcontentloaded 等待。
+ */
+export async function loginByCredentials(page: Page, user: string, pwd: string): Promise<string> {
+  await page.goto('/#/login')
+  await page.waitForLoadState('domcontentloaded')
+
+  const token = await page.evaluate(
+    async ({ u, p, cid }) => {
+      const resp = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: u,
+          password: p,
+          clientId: cid,
+          grantType: 'password',
+          tenantId: '000000',
+        }),
+      })
+      const j = await resp.json()
+      const data = j.data || {}
+      const auth = {
+        scope:             data.scope            ?? null,
+        openid:            data.openid           ?? null,
+        access_token:      data.access_token,
+        refresh_token:     data.refresh_token,
+        expire_in:         data.expire_in,
+        refresh_expire_in: data.refresh_expire_in,
+        client_id:         cid,
+      }
+      localStorage.setItem('book-ui:auth', JSON.stringify(auth))
+      return data.access_token as string
+    },
+    { u: user, p: pwd, cid: CLIENT_ID },
+  )
+
+  expect(token, `loginByCredentials(${user}) 失败`).toBeTruthy()
+
+  await page.reload()
+  await page.waitForLoadState('domcontentloaded')
+
+  return token
+}
+
+/**
  * 登录并返回 access_token。
  * 内部已完成 localStorage 写入 + page.reload() + domcontentloaded 等待。
  * 调用方无需再 reload，直接 page.goto 业务页即可。

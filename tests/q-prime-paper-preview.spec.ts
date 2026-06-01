@@ -17,52 +17,15 @@
  *   pnpm test:q-prime:headed       # 看浏览器（PDF download 行为需 headed 验）
  */
 import { test, expect, Page } from '@playwright/test'
+import { IS_PROD, CLIENT_ID } from './helpers/env'
+import { loginByApi } from './helpers/auth'
 
-const TEACHER_USER = 'teacher001'
-const TEACHER_PWD = '666666'
-const CLIENT_ID = 'e5cd7e4891bf95d1d19206ce24a7b32e'
+// local-only: 试卷预览/导出 PDF 为写操作
+test.skip(IS_PROD, 'local-only: 依赖 dev 数据契约/写操作/双BE')
 
 // MCP 已验 — 这 5 个 id 都有 freeTag（含多 tag）
 const TEST_IDS = [1045, 1046, 1047, 1052, 1054]
 
-/**
- * 登录 — 走 /auth/login fetch 拿 token 注入 localStorage。
- * caller 后续需 reload 让 pinia store init 读到 LS。
- */
-async function loginAsTeacher(page: Page): Promise<string> {
-  await page.goto('/#/login')
-  await page.waitForLoadState('domcontentloaded')
-
-  const token = await page.evaluate(async ({ user, pwd, cid }) => {
-    const resp = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        username: user,
-        password: pwd,
-        clientId: cid,
-        grantType: 'password',
-        tenantId: '000000',
-      }),
-    })
-    const j = await resp.json()
-    const data = j.data || {}
-    const auth = {
-      scope: data.scope ?? null,
-      openid: data.openid ?? null,
-      access_token: data.access_token,
-      refresh_token: data.refresh_token,
-      expire_in: data.expire_in,
-      refresh_expire_in: data.refresh_expire_in,
-      client_id: cid,
-    }
-    localStorage.setItem('book-ui:auth', JSON.stringify(auth))
-    return data.access_token as string
-  }, { user: TEACHER_USER, pwd: TEACHER_PWD, cid: CLIENT_ID })
-
-  expect(token, '登录失败 — teacher001 账号是否存在？BE 8080 是否起？').toBeTruthy()
-  return token
-}
 
 /**
  * 把题目 id 写进 LS basket（跳过 UI 加题，省时）— 复用 Q 卡 spec 模式
@@ -84,10 +47,8 @@ async function seedBasketLS(page: Page, ids: number[]) {
 test.describe(`Q' 卡 · 试卷预览模态 + LaTeX + PDF`, () => {
 
   test('T1. 工作台"导出 PDF"按钮去 disabled — 可点击打开预览模态', async ({ page }) => {
-    await loginAsTeacher(page)
-    await page.reload()
-    await page.waitForLoadState('domcontentloaded')
-
+    await loginByApi(page, 'teacher')
+    // loginByApi 已完成 reload，直接 goto
     await page.goto('/#/question/index')
     await page.waitForLoadState('domcontentloaded')
     await seedBasketLS(page, TEST_IDS)
@@ -113,21 +74,21 @@ test.describe(`Q' 卡 · 试卷预览模态 + LaTeX + PDF`, () => {
   })
 
   test('T2. listByIds API 200 + 字段全（含 freeTags / answer / explain）', async ({ page }) => {
-    const token = await loginAsTeacher(page)
+    const token = await loginByApi(page, 'teacher')
 
-    const result = await page.evaluate(async ({ tk, ids }) => {
+    const result = await page.evaluate(async ({ tk, ids, cid }) => {
       const resp = await fetch(`/api/teacher/question/list?ids=${ids.join(',')}`, {
         method: 'GET',
         headers: {
           Authorization: `Bearer ${tk}`,
-          clientid: 'e5cd7e4891bf95d1d19206ce24a7b32e',
+          clientid: cid,
         },
       })
       return {
         status: resp.status,
         body: await resp.json(),
       }
-    }, { tk: token, ids: TEST_IDS })
+    }, { tk: token, ids: TEST_IDS, cid: CLIENT_ID })
 
     expect(result.status, 'HTTP 200').toBe(200)
     // /teacher/* 走 MisiktEnvelopeAdvice envelope { code:1, message:"成功", response: [...] }
@@ -154,10 +115,8 @@ test.describe(`Q' 卡 · 试卷预览模态 + LaTeX + PDF`, () => {
   })
 
   test('T3. 模态打开后题目渲染 + 答案/解析 checkbox 切换', async ({ page }) => {
-    await loginAsTeacher(page)
-    await page.reload()
-    await page.waitForLoadState('domcontentloaded')
-
+    await loginByApi(page, 'teacher')
+    // loginByApi 已完成 reload，直接 goto
     await page.goto('/#/question/index')
     await page.waitForLoadState('domcontentloaded')
     await seedBasketLS(page, TEST_IDS)
@@ -199,10 +158,8 @@ test.describe(`Q' 卡 · 试卷预览模态 + LaTeX + PDF`, () => {
     })
     page.on('pageerror', e => consoleErrors.push(`[pageerror] ${e.message}`))
 
-    await loginAsTeacher(page)
-    await page.reload()
-    await page.waitForLoadState('domcontentloaded')
-
+    await loginByApi(page, 'teacher')
+    // loginByApi 已完成 reload，直接 goto
     await page.goto('/#/question/index')
     await page.waitForLoadState('domcontentloaded')
     // T4 用更少的题 + 不带图测试，避免 OSS CORS / 大图 + 30s download 卡死

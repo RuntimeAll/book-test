@@ -6,6 +6,10 @@
   "description": "misikt 教师端复刻 - 跨栈 E2E 回归测试套（Playwright）",
   "scripts": {
     "test": "playwright test",
+    "test:prd001": "playwright test tests/prd-001-paper-basket.spec.ts",
+    "test:prd001:headed": "playwright test tests/prd-001-paper-basket.spec.ts --headed",
+    "test:prd002": "playwright test tests/prd-002-profile-regression.spec.ts tests/prd-002-profile-acceptance.spec.ts",
+    "test:prd002:headed": "playwright test tests/prd-002-profile-regression.spec.ts tests/prd-002-profile-acceptance.spec.ts --headed",
     "test:v1": "playwright test tests/v1-question-bank-regression.spec.ts",
     "test:v1:headed": "playwright test tests/v1-question-bank-regression.spec.ts --headed",
     "test:v05": "playwright test tests/v05-paper-library.spec.ts",

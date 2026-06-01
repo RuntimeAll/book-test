@@ -19,11 +19,11 @@
  *   pnpm test:v1 --grep BUG-2    # 跑单组
  */
 import { test, expect, Page } from '@playwright/test'
+import { IS_PROD } from './helpers/env'
+import { loginByApi } from './helpers/auth'
 
-// ─── 测试常量 ────────────────────────────────────────────────
-const ADMIN_USER = 'admin'
-const ADMIN_PWD = 'admin123'
-const CLIENT_ID = 'e5cd7e4891bf95d1d19206ce24a7b32e'
+// local-only: 依赖 biz_subject ≥ 2116 dev 数据契约
+test.skip(IS_PROD, 'local-only: 依赖 dev 数据契约/写操作/双BE')
 
 // W-6 修复后的章节关联期望（biz_question_knowledge JOIN 后）
 // 这些数字会随题库增长而变大 — 用 >= 断言不用 ===
@@ -40,56 +40,10 @@ const EXPECTED_MIN = {
 // ─── 公共 helper ──────────────────────────────────────────────
 
 /**
- * 登录 — 直接打 /auth/login 拿 token 存 localStorage，然后 reload 让 pinia store init。
- *
- * 关键：book-ui src/store/user.ts 的 loadFromStorage 只在 setup store 初始化时跑一次，
- * 不 reload 直接 goto 业务页 → router.beforeEach 看 isLoggedIn=false 跳回 /login。
- *
- * 返回 token 仅供直接 fetch 调 BE 用（UI 链路场景靠 localStorage + reload）。
- */
-async function loginAsAdmin(page: Page): Promise<string> {
-  await page.goto('/#/login')
-  await page.waitForLoadState('domcontentloaded')
-  const token = await page.evaluate(async ({ user, pwd, cid }) => {
-    const resp = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        username: user,
-        password: pwd,
-        clientId: cid,
-        grantType: 'password',
-        tenantId: '000000',
-      }),
-    })
-    const j = await resp.json()
-    const data = j.data || {}
-    const auth = {
-      scope: data.scope ?? null,
-      openid: data.openid ?? null,
-      access_token: data.access_token,
-      refresh_token: data.refresh_token,
-      expire_in: data.expire_in,
-      refresh_expire_in: data.refresh_expire_in,
-      client_id: cid,
-    }
-    localStorage.setItem('book-ui:auth', JSON.stringify(auth))
-    return data.access_token as string
-  }, { user: ADMIN_USER, pwd: ADMIN_PWD, cid: CLIENT_ID })
-
-  expect(token, '登录失败 — BE 是否在 8080 起？admin 账号是否存在？').toBeTruthy()
-  return token
-}
-
-/**
  * 进题库页且确保 vm 已挂载。
- *
- * 关键：先 reload 让 pinia store 用最新 localStorage 重新 init（loadFromStorage 仅
- * 在 setup store 首次创建时跑一次，loginAsAdmin 写完 localStorage 时 store 已 init 过）。
- * 然后等 .filter-bar / 列表 / 空态任一出现，比 networkidle 稳。
+ * loginByApi 已完成 reload，直接 goto 业务页。
  */
 async function gotoQuestionIndex(page: Page) {
-  await page.reload()
   await page.goto('/#/question/index')
   await page.waitForSelector('.el-select, .question-list, .el-empty', { timeout: 15000 })
   await page.waitForTimeout(1000) // 让 lazyTree / questionPage 首批结果落
@@ -138,7 +92,7 @@ async function findQuestionVmCtx(page: Page) {
 
 test.describe('V1 卡 BE 端口契约 — curl 级别', () => {
   test.beforeEach(async ({ page }) => {
-    await loginAsAdmin(page)
+    await loginByApi(page, 'admin')
   })
 
   test('Bug C — 难度筛选 difficult=4 命中（FE difficulty→difficult 字段对齐）', async ({ page }) => {
@@ -235,7 +189,7 @@ test.describe('V1 卡 BE 端口契约 — curl 级别', () => {
 
 test.describe('V1 卡 UI 全链路 — 题库页', () => {
   test.beforeEach(async ({ page }) => {
-    await loginAsAdmin(page)
+    await loginByApi(page, 'admin')
     await gotoQuestionIndex(page)
     expect(await findQuestionVmCtx(page), '题库页 vm 未挂载').toBe(true)
   })
@@ -351,7 +305,7 @@ test.describe('V1 卡 核心目标 — 0 个 misikt.com 请求', () => {
       if (u.includes('misikt.com')) misiktRequests.push(u)
     })
 
-    await loginAsAdmin(page)
+    await loginByApi(page, 'admin')
     await gotoQuestionIndex(page)
 
     // 点章节 + 筛选触发若干请求
@@ -396,7 +350,7 @@ test.describe('J 卡段③ — N+1 favorite GET 已删', () => {
       }
     })
 
-    await loginAsAdmin(page)
+    await loginByApi(page, 'admin')
     await gotoQuestionIndex(page)
     // 等列表渲染完
     await page.waitForSelector('.question-card', { timeout: 10000 }).catch(() => {})
