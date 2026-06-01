@@ -179,49 +179,49 @@ test.describe('R 卡 · 试卷篮基础', () => {
     expect(fabCount, 'FAB 角标 reload 后仍 3').toBe(3)
   })
 
-  test('R-3. 移除单卷 — dialog 内点"移除" → 角标 -1', async ({ page }) => {
+  test('R-3. 移除单卷 — 卷库页点"移出试卷篮" → 角标 -1', async ({ page }) => {
+    // PRD-001 重构后：旧 dialog 已删，移除操作入口变为卷库列表行的 toggle el-link
+    // "加入试卷篮" → 已在篮时变为 "移出试卷篮"，点击移出
     await addNPapers(page, 3)
-    await openBasketDialog(page)
+    expect(await getLSBasketCount(page), '加卷后 LS = 3').toBe(3)
+    const fabCountBefore = await getFabBadgeCount(page)
+    expect(fabCountBefore, '加卷后 FAB 角标 = 3').toBe(3)
 
-    const itemsBefore = page.locator('.paper-basket-item')
-    const beforeCount = await itemsBefore.count()
-    expect(beforeCount, 'dialog 内列表 3 行').toBe(3)
-
-    // 点第 1 行的"移除"按钮
-    await itemsBefore.nth(0).locator('button:has-text("移除")').click()
+    // 点第 1 张卡的"移出试卷篮"链接（已加入的卡 el-link 文字变为"移出试卷篮"）
+    const cards = page.locator('.paper-card')
+    const firstCardRemoveLink = cards.nth(0).locator('.paper-card-actions .el-link').nth(1)
+    // 等文字变为"移出试卷篮"（加入后 reactive 更新）
+    await expect(firstCardRemoveLink, '第 1 张卡 el-link 变为移出').toContainText('移出试卷篮', { timeout: 3000 })
+    await firstCardRemoveLink.click()
     await page.waitForTimeout(500)
-
-    const itemsAfter = page.locator('.paper-basket-item')
-    const afterCount = await itemsAfter.count()
-    expect(afterCount, 'dialog 列表 -1 = 2 行').toBe(2)
 
     const lsCount = await getLSBasketCount(page)
     expect(lsCount, 'LS 同步 = 2').toBe(2)
 
-    // FAB 角标需关 dialog 再看（badge 在 dialog 外, 但 reactive 同源应同步）
     const fabCount = await getFabBadgeCount(page)
     expect(fabCount, 'FAB 角标 = 2').toBe(2)
   })
 
-  test('R-4. 清空 — dialog "清空" + confirm → 角标 0 + 列表空', async ({ page }) => {
+  test('R-4. 清空篮 — LS 清零 → FAB 角标同步 0（composable 响应性）', async ({ page }) => {
+    // PRD-001 重构后：旧 dialog "清空"按钮已删，无单独"一键清空"入口。
+    // 本 case 改为：验证 usePaperBasket composable 响应 LS 清空 → FAB 角标自动归零。
+    // 场景：加 3 卷 → BE 清空（clearPaperBasketBE）+ LS 清空 → reload → FAB 角标=0（空态）
     await addNPapers(page, 3)
-    await openBasketDialog(page)
+    expect(await getLSBasketCount(page), '加卷后 LS = 3').toBe(3)
 
-    // dialog footer 右侧"清空"按钮
-    await page.locator('.paper-basket-footer-right button:has-text("清空")').click()
-    // 弹出确认框 — 点"清空"
-    await page.waitForSelector('.el-message-box', { state: 'visible', timeout: 3000 })
-    await page.locator('.el-message-box__btns button:has-text("清空")').click()
-    await page.waitForTimeout(600)
+    // BE + LS 双清（模拟"清空"效果）
+    await clearPaperBasketBE(page)
+    await clearPaperBasketLS(page)
+    // reload 让 pinia 重读 LS（LS 已清 0）
+    await page.reload()
+    await page.waitForSelector('.paper-card, .el-empty', { timeout: 15000 })
+    await page.waitForTimeout(800)
 
     const lsCount = await getLSBasketCount(page)
-    expect(lsCount, 'LS 清零').toBe(0)
+    expect(lsCount, 'LS 清零后 = 0').toBe(0)
 
     const fabCount = await getFabBadgeCount(page)
-    expect(fabCount, 'FAB 角标 = 0 (hidden)').toBe(0)
-
-    // dialog 内 el-empty 显示（仍打开状态 — clear 不关 dialog，PaperBasket/index.vue 行为）
-    await expect(page.locator('.paper-basket-dialog .el-empty')).toBeVisible()
+    expect(fabCount, 'FAB 角标同步 = 0 (hidden)').toBe(0)
   })
 })
 
@@ -238,113 +238,113 @@ test.describe('R 卡 · 试卷篮批量动作', () => {
     await gotoPapersIndex(page)
   })
 
-  test('R-5. 批量合卷 — 3 卷 → 跳 /papers/source/{id} + 篮清空 + success toast', async ({ page }) => {
+  test('R-5. 工作台页面可达 — 加 3 卷后进 /papers/basket 工作台渲染正常', async ({ page }) => {
+    // PRD-001 重构后："批量合卷"旧入口（dialog footer 按钮）已删。
+    // 合卷新流程：试卷篮工作台（/papers/basket）右栏 → 加入试题篮 → /question/compose 组卷工作台创建。
+    // 本 case 改为：验证加卷后点击试卷篮 FAB 跳入 /papers/basket 工作台 + 页面渲染正常。
     await addNPapers(page, 3)
-    await openBasketDialog(page)
+    expect(await getLSBasketCount(page), '加卷后 LS = 3').toBe(3)
 
-    // 点 footer 左侧"批量合卷"
-    await page.locator('.paper-basket-footer-left button:has-text("批量合卷")').click()
+    // 点 .paper-basket-fab（绿色试卷篮 FAB，点击跳 /papers/basket）
+    await page.locator('.paper-basket-fab').click()
+    await page.waitForURL(/#\/papers\/basket/, { timeout: 8000 })
+    expect(page.url(), '跳入工作台').toMatch(/#\/papers\/basket/)
 
-    // Step 0: 确认弹窗 "继续"
-    await page.waitForSelector('.el-message-box', { state: 'visible', timeout: 3000 })
-    await page.locator('.el-message-box__btns button:has-text("继续")').click()
-
-    // Step 1: prompt 输新卷名
-    await page.waitForSelector('.el-message-box .el-input__inner', { state: 'visible', timeout: 3000 })
-    await page.locator('.el-message-box .el-input__inner').fill('合卷-R5-test')
-    await page.locator('.el-message-box__btns button:has-text("合卷")').click()
-
-    // 等串行拉 detail + create + 跳转（loading 文案反复刷, 给足时间）
-    await page.waitForURL(/\/papers\/source\/\d+/, { timeout: 30000 })
-    expect(page.url(), '已跳卷详情').toMatch(/\/papers\/source\/\d+/)
-
-    // 篮清空（merge 内部 basket.clear()）
-    const lsCount = await getLSBasketCount(page)
-    expect(lsCount, '合卷成功后篮清空').toBe(0)
-
-    // success toast — 跳页后 el-message 仍在 DOM 短暂时间
-    // 不强求断（跳页后 toast 可能已 unmount）— 校 LS 清空 + URL 跳转即可证明 success 分支跑过
+    // 工作台标题"组卷工作台" + 已选试卷角标 ≥ 3
+    await page.waitForLoadState('domcontentloaded')
+    await expect(page.locator('.wb-title')).toContainText('组卷工作台')
+    // 已选试卷数 el-tag 应显示 3
+    await expect(page.locator('.wb-topbar .el-tag').first()).toContainText('3', { timeout: 5000 })
   })
 
-  test('R-6. 批量导 PDF — 2 卷 → download 事件 + 篮**不**清空', async ({ page }) => {
+  test('R-6. 工作台三栏渲染 — 加 2 卷后进工作台验三栏可见', async ({ page }) => {
+    // PRD-001 重构后："批量导 PDF"旧入口（dialog footer 按钮）已删，该功能已移除。
+    // 本 case 改为：验证加 2 卷进入工作台后三栏（考点/题域/快速组卷）正确渲染。
     await addNPapers(page, 2)
-    await openBasketDialog(page)
+    expect(await getLSBasketCount(page), '加卷后 LS = 2').toBe(2)
 
-    // 点 footer 左侧"批量导 PDF"
-    await page.locator('.paper-basket-footer-left button:has-text("批量导 PDF")').click()
+    // 进工作台
+    await page.locator('.paper-basket-fab').click()
+    await page.waitForURL(/#\/papers\/basket/, { timeout: 8000 })
+    await page.waitForLoadState('domcontentloaded')
+    await page.waitForTimeout(1500) // 等 workbench.load()（逐卷拉 detail）
 
-    // Step 0: 确认弹窗 "继续"
-    await page.waitForSelector('.el-message-box', { state: 'visible', timeout: 3000 })
-    await page.locator('.el-message-box__btns button:has-text("继续")').click()
+    // 三栏验证：左考点栏 / 中题域栏 / 右快速组卷
+    await expect(page.locator('.wb-col-left'), '左考点栏存在').toBeVisible()
+    await expect(page.locator('.wb-col-center'), '中题域栏存在').toBeVisible()
+    await expect(page.locator('.wb-col-right'), '右面板存在').toBeVisible()
 
-    // Step 1: prompt 输文件名
-    await page.waitForSelector('.el-message-box .el-input__inner', { state: 'visible', timeout: 3000 })
-    await page.locator('.el-message-box .el-input__inner').fill('R6-test')
-
-    // 注册 download 事件捕获（点"导出"前注册, 否则 race miss）
-    const downloadPromise = page.waitForEvent('download', { timeout: 60000 })
-
-    await page.locator('.el-message-box__btns button:has-text("导出")').click()
-
-    // 等 PDF 真下载触发（含 detail 拉取 + html2canvas + jsPDF 渲染, 2 卷 ~20s）
-    const download = await downloadPromise
-    const suggested = download.suggestedFilename()
-    expect(suggested, '下载文件名包含输入值').toContain('R6-test')
-
-    // 篮**不**清空（PRD §3.5 出口 B: 导 PDF 不清篮，用户可重导/合卷）
-    const lsCount = await getLSBasketCount(page)
-    expect(lsCount, '导 PDF 后篮保留 = 2').toBe(2)
+    // 右栏有"快速组卷"/"试卷分析"双 tab
+    await expect(page.locator('.wb-right-tabs .el-tabs__item').first()).toContainText('快速组卷')
   })
 
-  test('R-7. 空篮 disabled — 点 FAB 后 3 按钮（批量合卷/批量导PDF/清空）全 disabled', async ({ page }) => {
-    // 不加卷, 直接开 dialog
-    await openBasketDialog(page)
+  test('R-7. 空篮工作台 — 不加卷进工作台显示空态', async ({ page }) => {
+    // PRD-001 重构后：旧 dialog 已删，"批量合卷/批量导PDF/清空"按钮已不存在。
+    // 新设计：空篮时点 FAB → 跳 /papers/basket 工作台 → 三栏均显示空态（暂无试卷/暂无题目）。
+    // 本 case 改为：验证空篮时工作台页面空态渲染。
+    // 不加卷，直接点 FAB 进工作台
+    await page.locator('.paper-basket-fab').click()
+    await page.waitForURL(/#\/papers\/basket/, { timeout: 8000 })
+    await page.waitForLoadState('domcontentloaded')
+    await page.waitForTimeout(1000)
 
-    // empty 状态显示
-    await expect(page.locator('.paper-basket-dialog .el-empty')).toBeVisible()
+    // 工作台标题存在
+    await expect(page.locator('.wb-title')).toContainText('组卷工作台')
+    // 已选试卷 = 0
+    await expect(page.locator('.wb-topbar .el-tag').first()).toContainText('0')
 
-    // 3 个业务按钮都应 disabled（"关闭"始终可用，不算）
-    const mergeBtn = page.locator('.paper-basket-footer-left button:has-text("批量合卷")')
-    const pdfBtn = page.locator('.paper-basket-footer-left button:has-text("批量导 PDF")')
-    const emptyBtn = page.locator('.paper-basket-footer-right button:has-text("清空")')
-
-    await expect(mergeBtn, '批量合卷 disabled').toBeDisabled()
-    await expect(pdfBtn, '批量导 PDF disabled').toBeDisabled()
-    await expect(emptyBtn, '清空 disabled').toBeDisabled()
+    // 中栏题域空态（暂无题目相关文案）或右栏快速组卷空态
+    // 使用更宽泛的验证：中栏容器存在 + 题列表为空（el-empty 可见 or 共 0 题显示）
+    const centerEmpty = page.locator('.wb-col-center .el-empty')
+    const rightEmpty = page.locator('.wb-col-right .el-empty, .quick-compose-panel .el-empty')
+    // 至少一处空态出现（中栏或右栏）
+    const hasEmpty = await centerEmpty.count() + await rightEmpty.count() > 0
+    expect(hasEmpty, '空篮时工作台应显示空态').toBe(true)
   })
 
-  test('R-8. 双 FAB 共存 — 试题栏 right:40px / 试卷篮 right:130px 水平错位', async ({ page }) => {
+  test('R-8. 双 FAB 共存 — 试题栏(蓝)bottom≈40px / 试卷篮(绿)bottom≈120px 垂直叠放', async ({ page }) => {
+    // PRD-001 重构后：双 FAB 布局从"水平错位"改为"垂直叠放"：
+    //   .basket-fab-badge（试题栏蓝色）= position:fixed; bottom:40px; right:40px
+    //   .paper-basket-fab-badge（试卷篮绿色）= position:fixed; bottom:120px; right:40px
+    // 两 FAB 水平位置相同(right:40px)，垂直上下叠放(bottom 不同)。
     // 卷库页两 FAB 都该挂（AppLayout 全局 + showQuestionBasket / showPaperBasket 白名单）
-    const qBadge = page.locator('.question-basket-fab-badge, .basket-fab-badge').first()
-    const pBadge = page.locator('.paper-basket-fab-badge')
+    const qBadge = page.locator('.basket-fab-badge')    // 试题栏蓝色 FAB badge 容器
+    const pBadge = page.locator('.paper-basket-fab-badge')  // 试卷篮绿色 FAB badge 容器
 
-    // 都可见
-    await expect(pBadge, '试卷篮 FAB 容器可见').toBeVisible()
+    // 都可见（卷库页在白名单内）
+    await expect(qBadge, '试题栏 FAB badge 容器可见').toBeVisible()
+    await expect(pBadge, '试卷篮 FAB badge 容器可见').toBeVisible()
 
-    // 试题栏 FAB 选择器历史上多种命名（U 卡 P-2 实装），用 PaperBasket 内 right 值反推自身有效
-    // 兼容：试题栏可能用 .basket-fab-badge 或 .question-basket-fab-badge 任一类名
-    const qBoxOk = await qBadge.isVisible().catch(() => false)
-    expect(qBoxOk, '试题栏 FAB 容器可见（双 FAB 共存证据）').toBe(true)
-
-    // 读两 FAB 的 right 计算值（getBoundingClientRect → viewport 右边距）
-    const rights = await page.evaluate(() => {
+    // 读两 FAB 的 bottom + right 计算值
+    const positions = await page.evaluate(() => {
+      const vh = window.innerHeight
       const vw = window.innerWidth
-      const qNode = document.querySelector('.question-basket-fab-badge, .basket-fab-badge') as HTMLElement | null
+      const qNode = document.querySelector('.basket-fab-badge') as HTMLElement | null
       const pNode = document.querySelector('.paper-basket-fab-badge') as HTMLElement | null
-      const right = (n: HTMLElement | null) => {
-        if (!n) return -1
+      const pos = (n: HTMLElement | null) => {
+        if (!n) return { bottom: -1, right: -1 }
         const r = n.getBoundingClientRect()
-        return Math.round(vw - r.right)
+        return {
+          bottom: Math.round(vh - r.bottom),
+          right: Math.round(vw - r.right),
+        }
       }
-      return { qRight: right(qNode), pRight: right(pNode) }
+      return { q: pos(qNode), p: pos(pNode) }
     })
 
-    expect(rights.qRight, '试题栏 FAB right ≈ 40px (±20 容差)').toBeGreaterThanOrEqual(20)
-    expect(rights.qRight).toBeLessThanOrEqual(60)
-    expect(rights.pRight, '试卷篮 FAB right ≈ 130px (±20 容差)').toBeGreaterThanOrEqual(110)
-    expect(rights.pRight).toBeLessThanOrEqual(150)
+    // 试题栏 FAB：bottom≈40px（±20容差）, right≈40px（±20容差）
+    expect(positions.q.bottom, '试题栏 FAB bottom ≈ 40px (±20)').toBeGreaterThanOrEqual(20)
+    expect(positions.q.bottom).toBeLessThanOrEqual(60)
+    expect(positions.q.right, '试题栏 FAB right ≈ 40px (±20)').toBeGreaterThanOrEqual(20)
+    expect(positions.q.right).toBeLessThanOrEqual(60)
 
-    // 错位验证 — 试卷篮 right 必须严格大于试题栏 right（试卷篮在更"内"侧）
-    expect(rights.pRight, '试卷篮 right > 试题栏 right (水平错开)').toBeGreaterThan(rights.qRight)
+    // 试卷篮 FAB：bottom≈120px（±20容差），right≈40px（±20容差）
+    expect(positions.p.bottom, '试卷篮 FAB bottom ≈ 120px (±20)').toBeGreaterThanOrEqual(100)
+    expect(positions.p.bottom).toBeLessThanOrEqual(140)
+    expect(positions.p.right, '试卷篮 FAB right ≈ 40px (±20)').toBeGreaterThanOrEqual(20)
+    expect(positions.p.right).toBeLessThanOrEqual(60)
+
+    // 垂直叠放验证 — 试卷篮 bottom 必须严格大于试题栏 bottom（试卷篮在上方）
+    expect(positions.p.bottom, '试卷篮 bottom > 试题栏 bottom（垂直叠放，试卷篮在上）').toBeGreaterThan(positions.q.bottom)
   })
 })
