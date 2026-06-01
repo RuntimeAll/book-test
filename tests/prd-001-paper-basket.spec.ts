@@ -1,5 +1,6 @@
 /**
- * R 卡（试卷篮）回归测试套 — 段⑤ + 段⑥' 合并
+ * PRD-001（试卷篮）回归测试套 — 段⑤ + 段⑥' 合并
+ * (原 r-paper-basket.spec.ts，git mv 保留历史)
  *
  * 覆盖（8 case）：
  *   R-1. 加卷成功 — 卡片"加入试卷篮"el-link 点 3 卷 → toast + FAB 角标 = 3
@@ -17,62 +18,17 @@
  *   3. 卷库 ≥ 3 卷可加（V0.5 已就位 1592 卷）
  *   4. R 卡 BE 5 端点已起（addBasket/cancel/queryBasket/empty/basketNum）
  *
- * 跑（联调段⑦ 整体跑）：
- *   pnpm exec playwright test tests/r-paper-basket.spec.ts
- *   pnpm exec playwright test tests/r-paper-basket.spec.ts --headed
- *
- * 本段（段⑤+⑥'）只要 tsc + playwright list 8 用例齐 = 完工。
+ * local-only 守卫：加卷/移卷/合卷/导PDF 均为写操作，prod 跳过。
  */
 import { test, expect, type Page } from '@playwright/test'
-
-const TEACHER_USER = 'teacher001'
-const TEACHER_PWD = '666666'
-const CLIENT_ID = 'e5cd7e4891bf95d1d19206ce24a7b32e'
+import { IS_PROD, CLIENT_ID } from './helpers/env'
+import { loginByApi } from './helpers/auth'
 
 // LS keys（usePaperBasket.ts 顶部 LS_PAPER_BASKET_IDS / _CACHE 同源）
 const LS_BASKET_IDS = 'book-ui:paper-basket-ids'
 const LS_BASKET_CACHE = 'book-ui:paper-basket-cache'
 
 // ─── helpers ─────────────────────────────────────────────────
-
-/**
- * teacher001 登录 — 走 /auth/login fetch 拿 token 注入 LS。
- * caller 需 reload 让 pinia init 拿 LS token，否则 router guard 重定向 /login（U 卡踩坑沉淀）。
- */
-async function loginAsTeacher(page: Page): Promise<string> {
-  await page.goto('/#/login')
-  await page.waitForLoadState('domcontentloaded')
-
-  const token = await page.evaluate(async ({ user, pwd, cid }) => {
-    const resp = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        username: user,
-        password: pwd,
-        clientId: cid,
-        grantType: 'password',
-        tenantId: '000000',
-      }),
-    })
-    const j = await resp.json()
-    const data = j.data || {}
-    const auth = {
-      scope: data.scope ?? null,
-      openid: data.openid ?? null,
-      access_token: data.access_token,
-      refresh_token: data.refresh_token,
-      expire_in: data.expire_in,
-      refresh_expire_in: data.refresh_expire_in,
-      client_id: cid,
-    }
-    localStorage.setItem('book-ui:auth', JSON.stringify(auth))
-    return data.access_token as string
-  }, { user: TEACHER_USER, pwd: TEACHER_PWD, cid: CLIENT_ID })
-
-  expect(token, '登录失败 — teacher001 账号是否存在？BE 8080 是否起？').toBeTruthy()
-  return token
-}
 
 /**
  * 清空 LS 试卷篮（每 case beforeEach 调，防上一 case 残留污染）
@@ -110,10 +66,9 @@ async function clearPaperBasketBE(page: Page) {
 }
 
 /**
- * 进卷库页面 — reload 让 pinia 拿 LS token → 跳 /papers/index → 等卡片渲染
+ * 进卷库页面 — loginByApi 已完成 reload，直接 goto 业务页
  */
 async function gotoPapersIndex(page: Page) {
-  await page.reload()
   await page.goto('/#/papers/index')
   await page.waitForSelector('.paper-card, .el-empty', { timeout: 15000 })
   await page.waitForTimeout(1200) // 让首批 lazyTree + page 落
@@ -183,8 +138,11 @@ async function openBasketDialog(page: Page) {
 // ─── 段⑤ 基础 4 case ──────────────────────────────────────────
 
 test.describe('R 卡 · 试卷篮基础', () => {
+  // 加卷/移卷/清空为写操作 — prod 跳过
+  test.skip(IS_PROD, 'local-only: 依赖 dev 数据契约/写操作/双BE')
+
   test.beforeEach(async ({ page }) => {
-    await loginAsTeacher(page)
+    await loginByApi(page, 'teacher')
     await clearPaperBasketBE(page)  // 防 BE 残留 (R-6 不清篮 / 失败 case 跳过 clear)
     await clearPaperBasketLS(page)
     await gotoPapersIndex(page)
@@ -267,8 +225,11 @@ test.describe('R 卡 · 试卷篮基础', () => {
 // ─── 段⑥' 批量动作 4 case ─────────────────────────────────────
 
 test.describe('R 卡 · 试卷篮批量动作', () => {
+  // 批量合卷/导PDF 为写操作 — prod 跳过
+  test.skip(IS_PROD, 'local-only: 依赖 dev 数据契约/写操作/双BE')
+
   test.beforeEach(async ({ page }) => {
-    await loginAsTeacher(page)
+    await loginByApi(page, 'teacher')
     await clearPaperBasketBE(page)  // 防 BE 残留 (R-6 不清篮 / 失败 case 跳过 clear)
     await clearPaperBasketLS(page)
     await gotoPapersIndex(page)

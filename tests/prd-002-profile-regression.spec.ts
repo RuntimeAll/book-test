@@ -1,46 +1,15 @@
 /**
  * PRD-002 个人资料页 浏览器回归（第 1 轮）
  *
- * 应用地址固定 http://localhost:5173（用户指定，非 webServer 4010）。
  * teacher001/666666 登录态走内页。
  *
  * 跑：
- *   cd codeplace-A/book-test
- *   $env:PRD002_BASE='http://localhost:5173'
+ *   cd codeplace-O/book-test
  *   pnpm exec playwright test prd-002-profile-regression --reporter=list
  */
 import { test, expect, Page } from '@playwright/test'
-
-const BASE = process.env.PRD002_BASE || 'http://localhost:5173'
-const TEACHER_USER = 'teacher001'
-const TEACHER_PWD = '666666'
-const CLIENT_ID = 'e5cd7e4891bf95d1d19206ce24a7b32e'
-
-async function loginAsTeacher(page: Page): Promise<string> {
-  await page.goto(`${BASE}/#/login`)
-  await page.waitForLoadState('domcontentloaded')
-  const token = await page.evaluate(async ({ user, pwd, cid }) => {
-    const resp = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        username: user, password: pwd, clientId: cid,
-        grantType: 'password', tenantId: '000000',
-      }),
-    })
-    const j = await resp.json()
-    const data = j.data || {}
-    localStorage.setItem('book-ui:auth', JSON.stringify({
-      access_token: data.access_token,
-      refresh_token: data.refresh_token,
-      expire_in: data.expire_in,
-      client_id: cid,
-    }))
-    return data.access_token as string
-  }, { user: TEACHER_USER, pwd: TEACHER_PWD, cid: CLIENT_ID })
-  expect(token, `登录失败 — teacher001 是否存在？BE 8080 是否起？`).toBeTruthy()
-  return token
-}
+import { IS_PROD } from './helpers/env'
+import { loginByApi } from './helpers/auth'
 
 // 候选 profile 路由（PRD 没硬性 URL；尽量穷举常见命名）
 const PROFILE_ROUTES = [
@@ -50,15 +19,18 @@ const PROFILE_ROUTES = [
 ]
 
 test('PRD-002 个人资料页 浏览器回归 — G1~G5', async ({ page }) => {
+  // 改存字段为写操作 — prod 跳过
+  test.skip(IS_PROD, 'local-only: 依赖 dev 数据契约/写操作/双BE')
+
   const findings: string[] = []
 
-  await loginAsTeacher(page)
+  await loginByApi(page, 'teacher')
 
   // ── G1: profile 路由可达 + 6 字段表单 DOM ──
   let reachedRoute = ''
   let g1Dom = { realNameInput: false, sexRadio: false, gradeSelect: false, schoolInput: false, saveBtn: false }
   for (const r of PROFILE_ROUTES) {
-    await page.goto(`${BASE}${r}`)
+    await page.goto(r)
     await page.waitForLoadState('domcontentloaded')
     await page.waitForTimeout(800)
     const cur = await page.evaluate(() => location.hash)
@@ -92,7 +64,7 @@ test('PRD-002 个人资料页 浏览器回归 — G1~G5', async ({ page }) => {
   }
   findings.push(`G1 reachedRoute='${reachedRoute}' dom=${JSON.stringify(g1Dom)}`)
   if (!reachedRoute) {
-    await page.goto(`${BASE}/#/profile`)
+    await page.goto('/#/profile')
     await page.waitForTimeout(500)
     await page.screenshot({ path: 'test-results/prd-002-g1-no-route.png', fullPage: true })
   }

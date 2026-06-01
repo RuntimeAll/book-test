@@ -6,51 +6,17 @@
  * 账号: teacher001 / 666666
  *
  * 跑:
- *   cd codeplace-A/book-test
- *   $env:PRD002_BASE='http://localhost:5173'
+ *   cd codeplace-O/book-test
  *   pnpm exec playwright test prd-002-profile-acceptance --reporter=list
  *
  * 真实 UI 交互 (radio 切换 / select 展开 / 校验拦截) + network 监听。
  * MathJax CDN ERR_CONNECTION_CLOSED 是已知无关误报, 不判缺陷。
  */
 import { test, expect, Page, Request } from '@playwright/test'
+import { IS_PROD } from './helpers/env'
+import { loginByApi } from './helpers/auth'
 
-const BASE = process.env.PRD002_BASE || 'http://localhost:5173'
-const PROFILE_URL = `${BASE}/#/user/profile`
-const TEACHER_USER = 'teacher001'
-const TEACHER_PWD = '666666'
-const CLIENT_ID = 'e5cd7e4891bf95d1d19206ce24a7b32e'
-
-async function loginAsTeacher(page: Page): Promise<string> {
-  await page.goto(`${BASE}/#/login`)
-  await page.waitForLoadState('domcontentloaded')
-  const token = await page.evaluate(async ({ user, pwd, cid }) => {
-    const resp = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        username: user, password: pwd, clientId: cid,
-        grantType: 'password', tenantId: '000000',
-      }),
-    })
-    const j = await resp.json()
-    const data = j.data || {}
-    localStorage.setItem('book-ui:auth', JSON.stringify({
-      access_token: data.access_token,
-      refresh_token: data.refresh_token,
-      expire_in: data.expire_in,
-      client_id: cid,
-    }))
-    return data.access_token as string
-  }, { user: TEACHER_USER, pwd: TEACHER_PWD, cid: CLIENT_ID })
-  expect(token, `登录失败 — teacher001 是否存在？BE 8080 是否起？`).toBeTruthy()
-  // pinia store 在 app init 时已读过 localStorage（那时 token 还没写）→ reload 让 store 重新 init 读到 token，
-  // 否则路由守卫 isLoggedIn 仍为 false 把页面踢回 /login。
-  await page.reload()
-  await page.waitForLoadState('domcontentloaded')
-  await page.waitForTimeout(300)
-  return token
-}
+const PROFILE_URL = '/#/user/profile'
 
 /** 收集 network: current/update 的请求与响应 */
 interface NetCapture {
@@ -93,10 +59,13 @@ async function gotoProfile(page: Page) {
 }
 
 test('PRD-002 profile 验收 G1~G5', async ({ page }) => {
+  // 改存姓名为写操作 — prod 跳过
+  test.skip(IS_PROD, 'local-only: 依赖 dev 数据契约/写操作/双BE')
+
   const R: Record<string, any> = {}
   const cap = attachNetCapture(page)
 
-  await loginAsTeacher(page)
+  await loginByApi(page, 'teacher')
   await gotoProfile(page)
 
   // ============ G1: 路由可达 + 6 字段 DOM ============
