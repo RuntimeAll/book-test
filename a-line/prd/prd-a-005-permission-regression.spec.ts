@@ -1,7 +1,7 @@
 /**
  * PRD-A-005 收尾 · 边界/越权回归（G1 验证码 / G2 权限 / G6 锁死 / G7 越权 / G8 scope+detail 越权）
  *
- * 红线断言（owner 校验 / 越权拒绝 / scope 过滤 / detail 越权 null）。
+ * 红线断言（owner 校验在写接口 / 越权拒绝 / scope 过滤 / detail 只读放行）。
  * 失败即真 bug —— 不在此 skip 绕过（可信绿铁则）。
  *
  * /teacher/** envelope 约定：成功 code:1；ServiceException 透传 code:500；NotRole 透传 code:403。
@@ -13,7 +13,7 @@
  * 稳定数据锚点（dev miskt_data2，teacher001=user_id 5）：
  *   - 本人卷：create_by='5'（subject_id 多为 null，靠 create_by 命中 scope=mine）
  *   - 公共卷 671：create_by='2' subject_id='3001002'（公共分类树）→ detail 返数据 / update·delete 被拒
- *   - 他人私卷 1043：create_by='126' subject_id='5000'（非公共树）→ detail 返 null / update·delete 被拒
+ *   - 他人私卷 1043：create_by='126' subject_id='5000'（非公共树）→ detail 只读放行返数据 / update·delete 被拒
  *   - 他人收藏夹 id=2：user_id=999（回归 INSERT 造的越权锚点）→ rename·delete 被拒
  */
 import { test, expect, Page } from '@playwright/test'
@@ -55,7 +55,7 @@ test.describe('PRD-A-005 收尾 · 边界/越权', () => {
   // ════════════════════════════════════════════════════════════
   // G8：scope=mine 只返本人卷 + detail 公共卷返数据 / 他人私卷返 null
   // ════════════════════════════════════════════════════════════
-  test('G8 scope=mine 只返本人卷 + detail 公共卷有数据/他人私卷 null', async ({ page }) => {
+  test('G8 scope=mine 只返本人卷 + detail 公共卷/他人卷只读放行（非写接口不越权）', async ({ page }) => {
     await loginByApi(page, 'teacher')
 
     // G8a: page scope=mine 只返 create_by=登录用户的卷
@@ -75,10 +75,13 @@ test.describe('PRD-A-005 收尾 · 边界/越权', () => {
     expect(dPub.response, 'G8 detail 公共卷 671 返非空数据').toBeTruthy()
     expect(dPub.response?.paperId ?? dPub.response?.id, 'G8 公共卷 detail 含卷 id').toBeTruthy()
 
-    // G8c: detail 他人私卷 1043 返 null（越权拦截）
+    // G8c: detail 他人私卷 1043 也返数据 —— 🔴 2026-06-03 修：detail 是只读查看 / 组卷工作台拉题接口，
+    //   不做所有权越权（owner 锁死只在 update/delete 写接口）。此前误把 detail 收紧成"非本人非公共树返 null"，
+    //   导致组卷工作台对试卷篮内 5000* 卷拉题失败（"N 张卷加载失败，已跳过"、篮清不掉）。现只读查看放行。
     const dPriv = await apiPost(page, '/teacher/exam/paper/detail', { paperId: OTHERS_PRIVATE_PAPER_ID })
-    expect(dPriv.code).toBe(1) // envelope 仍 code:1，但 response 为 null
-    expect(dPriv.response, 'G8 detail 他人私卷 1043 返 null（越权拦截）').toBeFalsy()
+    expect(dPriv.code).toBe(1)
+    expect(dPriv.response, 'G8 detail 他人私卷 1043 只读放行（返非空数据，不再越权 null）').toBeTruthy()
+    expect(dPriv.response?.paperId ?? dPriv.response?.id, 'G8 他人私卷 detail 含卷 id').toBeTruthy()
   })
 
   // ════════════════════════════════════════════════════════════
@@ -231,7 +234,7 @@ test.describe('PRD-A-005 收尾 · 边界/越权', () => {
   // ════════════════════════════════════════════════════════════
   // G2 权限：teacher 持角色 2xx / 无 teacher 角色 403
   // ════════════════════════════════════════════════════════════
-  test('G2 权限：teacher 调受限接口成功 / superadmin(无teacher) 返 403', async ({ page }) => {
+  test('G2 加入试题栏：teacher + superadmin 均放行（核心功能不受 teacher 角色限制）', async ({ page }) => {
     // teacher 正路
     await loginByApi(page, 'teacher')
     const okT = await apiPost(page, '/teacher/question/addBasket/' + SAMPLE_QID, {})
@@ -255,7 +258,10 @@ test.describe('PRD-A-005 收尾 · 边界/越权', () => {
       return { loginOk: true, code: b.code, message: b.msg || b.message, httpStatus: r.status }
     })
     expect(adminProbe.loginOk, 'admin/admin123 dev 账号存在').toBe(true)
-    expect(adminProbe.code, 'G2 superadmin 无 teacher 角色调受限接口返 403').toBe(403)
+    // 🔴 2026-06-03 修：addBasket（加入试题栏）是核心高频功能，已去掉 @SaCheckRole("teacher")，
+    //   superadmin（无 teacher 角色）也应放行成功。此前误把它当"权限示范受限点"断言返 403 = 假绿，
+    //   掩盖了"superadmin 点全部加入试题栏报系统内部错误"的真 bug。权限机制示范已转移到前端路由守卫 /admin/console。
+    expect(adminProbe.code, 'G2 superadmin 调 addBasket 也放行成功（核心功能无 teacher 角色限制）').toBe(1)
   })
 
   // ════════════════════════════════════════════════════════════
