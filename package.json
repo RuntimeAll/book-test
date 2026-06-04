@@ -18,6 +18,8 @@
     "test:prd005:headed": "playwright test --config=playwright.a.config.ts a-line/prd/prd-a-005-acceptance.spec.ts a-line/prd/prd-a-005-permission-regression.spec.ts --headed",
     "test:prd006": "playwright test --config=playwright.a.config.ts a-line/prd/prd-a-006-merge-edit.spec.ts",
     "test:prd006:headed": "playwright test --config=playwright.a.config.ts a-line/prd/prd-a-006-merge-edit.spec.ts --headed",
+    "test:prd007": "playwright test --config=playwright.a.config.ts a-line/prd/prd-a-007-workbench.spec.ts a-line/prd/prd-a-007-basket-strip.spec.ts",
+    "test:prd007:headed": "playwright test --config=playwright.a.config.ts a-line/prd/prd-a-007-workbench.spec.ts a-line/prd/prd-a-007-basket-strip.spec.ts --headed",
     "test:headed": "playwright test --config=playwright.a.config.ts --headed",
     "report": "playwright show-report"
   },
