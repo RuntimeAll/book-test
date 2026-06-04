@@ -120,6 +120,12 @@ async function setupMocks(page: Page) {
   }))
   // /teacher/* 走 misikt envelope {code:1, message, response}
   const tEnv = (resp: unknown) => ({ status: 200, contentType: 'application/json', body: JSON.stringify({ code: 1, message: 'ok', response: resp }) })
+  // mock getCurrentUser：路由守卫在 roles.length===0 时会调此接口；
+  // 不 mock 会发到真 BE (mock-tok 无效) → HTTP 401 → redirectToLogin → auth 被 clear + push /login，
+  // 导致 source 等需要 onMounted 拉 userInfo 的页面无法渲染。
+  await page.route('**/api/teacher/user/current', (route) => route.fulfill(tEnv({
+    id: 1, userName: 'mock-teacher', roles: ['teacher'],
+  })))
   await page.route('**/api/teacher/question/page', (route) => route.fulfill(tEnv(MOCK_Q_LIST)))
   await page.route('**/api/teacher/question/lazyTree', (route) => route.fulfill(tEnv(MOCK_LAZY_TREE)))
   await page.route('**/api/teacher/question/basketNum', (route) => route.fulfill(tEnv(0)))

@@ -46,7 +46,10 @@ async function seedBasketLS(page: Page, ids: number[]) {
 
 test.describe(`Q' 卡 · 试卷预览模态 + LaTeX + PDF`, () => {
 
-  test('T1. 工作台"导出 PDF"按钮去 disabled — 可点击打开预览模态', async ({ page }) => {
+  // 现行契约（PRD-A-007）：/question/compose 已重定向到 /papers/workbench。
+  // workbench.vue 的导出按钮文案是"下载 PDF"（不是"导出 PDF"），位于右栏底部固定控制台。
+  // workbench 无 .page-title，顶栏是 .workbench-topbar + 内联标题输入框。
+  test('T1. 工作台"下载 PDF"按钮去 disabled — 可点击打开预览模态', async ({ page }) => {
     await loginByApi(page, 'teacher')
     // loginByApi 已完成 reload，直接 goto
     await page.goto('/#/question/index')
@@ -55,21 +58,24 @@ test.describe(`Q' 卡 · 试卷预览模态 + LaTeX + PDF`, () => {
     await page.reload()
     await page.waitForLoadState('domcontentloaded')
 
+    // /question/compose 已重定向到 /papers/workbench（PRD-A-007 路由收敛）
     await page.goto('/#/question/compose')
     await page.waitForLoadState('domcontentloaded')
+    // 重定向后应落在 /papers/workbench
+    await page.waitForURL(/#\/papers\/workbench/, { timeout: 5000 })
 
-    // 工作台标题渲染
-    await expect(page.locator('.page-title')).toContainText('组卷工作台')
+    // 工作台顶栏（workbench 无 .page-title，标题是内联输入框）
+    await expect(page.locator('.workbench-topbar')).toBeVisible()
 
-    // 导出 PDF 按钮可点（Q' 卡核心 — 不再 disabled）
-    const exportBtn = page.locator('button:has-text("导出 PDF")')
-    await expect(exportBtn).toBeVisible()
+    // 下载 PDF 按钮可点（workbench 右栏底部固定控制台，basket 有题时不 disabled）
+    const exportBtn = page.locator('button:has-text("下载 PDF")')
+    await expect(exportBtn).toBeVisible({ timeout: 5000 })
     await expect(exportBtn).toBeEnabled()
 
     // 点击打开模态
     await exportBtn.click()
 
-    // 模态可见（el-dialog 通常出现 .el-dialog 容器）
+    // 模态可见（el-dialog 容器）
     await expect(page.locator('.paper-preview-dialog, .el-dialog').first()).toBeVisible({ timeout: 5000 })
   })
 
@@ -123,10 +129,13 @@ test.describe(`Q' 卡 · 试卷预览模态 + LaTeX + PDF`, () => {
     await page.reload()
     await page.waitForLoadState('domcontentloaded')
 
+    // /question/compose 已重定向到 /papers/workbench（PRD-A-007 路由收敛）
     await page.goto('/#/question/compose')
     await page.waitForLoadState('domcontentloaded')
+    await page.waitForURL(/#\/papers\/workbench/, { timeout: 5000 })
 
-    await page.locator('button:has-text("导出 PDF")').click()
+    // 按钮文案已改为"下载 PDF"
+    await page.locator('button:has-text("下载 PDF")').click()
 
     // 模态打开 + 等数据加载完（响应 fetch 后题目渲染出来）
     const dialog = page.locator('.paper-preview-dialog, .el-dialog').first()
@@ -167,10 +176,13 @@ test.describe(`Q' 卡 · 试卷预览模态 + LaTeX + PDF`, () => {
     await page.reload()
     await page.waitForLoadState('domcontentloaded')
 
+    // /question/compose 已重定向到 /papers/workbench（PRD-A-007 路由收敛）
     await page.goto('/#/question/compose')
     await page.waitForLoadState('domcontentloaded')
+    await page.waitForURL(/#\/papers\/workbench/, { timeout: 5000 })
 
-    await page.locator('button:has-text("导出 PDF")').click()
+    // 按钮文案已改为"下载 PDF"
+    await page.locator('button:has-text("下载 PDF")').click()
     const dialog = page.locator('.paper-preview-dialog, .el-dialog').first()
     await expect(dialog).toBeVisible({ timeout: 5000 })
 

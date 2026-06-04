@@ -95,25 +95,30 @@ test.describe('U 卡 · BE /teacher/user/current 返 roles 字段', () => {
   })
 })
 
-test.describe('U 卡 · BE /teacher/exam/paper/page 接受 createBy 过滤', () => {
-  test('createBy=999999999 不存在的用户返空集 total=0', async ({ page }) => {
+// 现行契约（2026-06-02 定）：PaperLibraryServiceImpl#page 故意忽略前端传的 createBy，
+// 改用 scope 语义（mine=当前用户 / 公共=subject_id 分类前缀），注释"绝不信任前端传的 createBy"。
+// 因此无论传何值 createBy，后端均视为不传 — 返回公共已发布集（total > 0）。
+test.describe('U 卡 · BE /teacher/exam/paper/page createBy 被忽略（服务端 scope 语义）', () => {
+  test('createBy=999999999（不存在用户）：BE 忽略 createBy，返公共已发布集 total>0', async ({ page }) => {
     await loginByApi(page, 'admin')
     const result = await callPaperPage(page, {
       pageIndex: 1,
       pageSize: 10,
       createBy: '999999999',
     })
-    expect(result.total, 'createBy 不匹配应返空集').toBe(0)
+    // 现行：BE 忽略 createBy，等同于不传，公共集应有数据
+    expect(result.total, 'BE 忽略 createBy，公共集 total>0').toBeGreaterThan(0)
   })
 
-  test('createBy=非数字字符串触发防注入返空', async ({ page }) => {
+  test('createBy=非数字字符串：BE 忽略 createBy，返公共已发布集 total>0', async ({ page }) => {
     await loginByApi(page, 'admin')
     const result = await callPaperPage(page, {
       pageIndex: 1,
       pageSize: 10,
       createBy: 'abc; DROP TABLE',
     })
-    expect(result.total, '非法 createBy 应被 \\d+ 白名单拦截返空').toBe(0)
+    // 现行：BE 忽略非法 createBy，等同于不传，公共集应有数据
+    expect(result.total, 'BE 忽略非法 createBy，公共集 total>0').toBeGreaterThan(0)
   })
 
   test('createBy=空串 / 不传 不过滤（向后兼容）', async ({ page }) => {
@@ -123,37 +128,37 @@ test.describe('U 卡 · BE /teacher/exam/paper/page 接受 createBy 过滤', () 
   })
 })
 
+// 现行契约（router/index.ts:35）：/ → /question/index（所有角色统一落点）。
+// login/index.vue:110：登录后 target='/'，全量刷新后路由守卫重定向 → /question/index。
+// 无角色分流，admin / teacher 登录后均落 /#/question/index。
 test.describe('U 卡 · FE 登录分流 + 菜单按角色', () => {
-  test('admin 登录后跳 /home + 菜单全显', async ({ page }) => {
-    await loginByApi(page, 'admin')
-    // 重新 goto /login 触发登录流（这次走 UI 而不是 fetch helper）
+  test('admin 登录后跳 /question/index + 菜单全显', async ({ page }) => {
+    // 走 UI 登录流
     await page.goto('/#/login')
     await page.fill('input[autocomplete="username"]', ADMIN.user)
     await page.fill('input[autocomplete="current-password"]', ADMIN.pwd)
     await page.click('button.login-button, .login-button')
 
-    // 等跳转完成（hash 路由 /home）
-    await page.waitForURL(/#\/home/, { timeout: 10000 })
-    expect(page.url(), 'admin 登录应跳 /home').toMatch(/#\/home/)
+    // 等跳转完成：现行路由 / → /question/index（所有角色统一落点）
+    await page.waitForURL(/#\/question\/index/, { timeout: 10000 })
+    expect(page.url(), 'admin 登录应跳 /question/index').toMatch(/#\/question\/index/)
 
-    // 菜单：当前 FE 导航菜单固定 5 项（admin / teacher 共用同一份 menuItems，
-    // 无角色差异渲染 — "作业管理/学生管理/班级管理"旧设计已精简，不在当前菜单）
-    // 校准为验证当前真实菜单项可见
+    // 菜单：当前 FE 导航菜单（admin / teacher 共用同一份 menuItems，无角色差异渲染）
     await expect(page.locator('.nav-item', { hasText: '我的工作台' })).toBeVisible()
     await expect(page.locator('.nav-item', { hasText: '卷库' })).toBeVisible()
     await expect(page.locator('.nav-item', { hasText: '题库' })).toBeVisible()
     await expect(page.locator('.nav-item', { hasText: '资料库' })).toBeVisible()
   })
 
-  test('teacher001 登录后跳 /workspace + 占位菜单隐藏', async ({ page }) => {
+  test('teacher001 登录后跳 /question/index + 占位菜单隐藏', async ({ page }) => {
     await page.goto('/#/login')
     await page.fill('input[autocomplete="username"]', TEACHER.user)
     await page.fill('input[autocomplete="current-password"]', TEACHER.pwd)
     await page.click('button.login-button, .login-button')
 
-    // 等跳转完成（hash 路由 /workspace）
-    await page.waitForURL(/#\/workspace/, { timeout: 10000 })
-    expect(page.url(), 'teacher001 登录应跳 /workspace').toMatch(/#\/workspace/)
+    // 等跳转完成：现行路由 / → /question/index（所有角色统一落点，无角色分流）
+    await page.waitForURL(/#\/question\/index/, { timeout: 10000 })
+    expect(page.url(), 'teacher001 登录应跳 /question/index').toMatch(/#\/question\/index/)
 
     // 菜单：作业 / 学生 / 班级 不可见（占位空壳隐藏）
     await expect(page.locator('.nav-item', { hasText: '作业管理' })).toHaveCount(0)
