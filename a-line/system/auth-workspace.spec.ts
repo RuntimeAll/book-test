@@ -143,11 +143,14 @@ test.describe('U 卡 · FE 登录分流 + 菜单按角色', () => {
     await page.waitForURL(/#\/question\/index/, { timeout: 10000 })
     expect(page.url(), 'admin 登录应跳 /question/index').toMatch(/#\/question\/index/)
 
-    // 菜单：当前 FE 导航菜单（admin / teacher 共用同一份 menuItems，无角色差异渲染）
+    // 菜单：当前 FE 导航菜单（admin / teacher 共用同一份 menuItems，无角色差异渲染）。
+    // 现行契约（AppLayout.vue:56-64）：首页 / 我的工作台 / 卷库 / 题库 四项。
+    // 「资料库」「管理控制台」用户 2026-06-04 拍板暂时隐藏不做开发（菜单去掉，路由保留备用），
+    // 故不再断言「资料库」可见 —— 反向断言它被隐藏（对照组，防误恢复）。
     await expect(page.locator('.nav-item', { hasText: '我的工作台' })).toBeVisible()
     await expect(page.locator('.nav-item', { hasText: '卷库' })).toBeVisible()
     await expect(page.locator('.nav-item', { hasText: '题库' })).toBeVisible()
-    await expect(page.locator('.nav-item', { hasText: '资料库' })).toBeVisible()
+    await expect(page.locator('.nav-item', { hasText: '资料库' })).toHaveCount(0)
   })
 
   test('teacher001 登录后跳 /question/index + 占位菜单隐藏', async ({ page }) => {
